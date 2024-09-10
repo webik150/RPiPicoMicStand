@@ -1,0 +1,116 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>RPi Pico Mic Stand</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        function hideLog() {
+            // toggle visibility of log
+            var log = document.getElementById('log');
+            log.style.display = log.style.display === 'none' ? 'block' : 'none';
+        }
+
+        function toggleRow(rowId) {
+            var row = document.getElementById(rowId);
+            row.classList.toggle('hidden');
+        }
+
+        function downloadLog() {
+            // create a new blob with the contents of #log
+            var blob = new Blob([document.getElementById('log').innerText], {type: 'text/plain'});
+            // create a new URL for the blob
+            var url = URL.createObjectURL(blob);
+            // create a new anchor element
+            var a = document.createElement('a');
+            // set the href attribute of the anchor to the URL of the blob
+            a.href = url;
+            // set the download attribute of the anchor to the filename
+            a.download = 'log.txt';
+            // append the anchor to the body
+            document.body.appendChild(a);
+            // click the anchor
+            a.click();
+            // remove the anchor from the body
+            document.body.removeChild(a);
+        }
+    </script>
+    <style>
+        #log {
+            white-space: pre;
+            display: block;
+        }
+    </style>
+</head>
+<body class="text-white min-h-screen bg-gradient-to-b from-gray-900 to-indigo-950 bg-contain">
+<!-- Using Tailwind CSS for styling -->
+<!-- Header with title and page name -->
+<header class="bg-gray-800 text-white p-4">
+    <h1 class="text-2xl font-bold">RPi Pico Mic Stand</h1>
+    <small class="text-gray-400">{{current_mode}}</small>
+</header>
+<!-- Main content, horizontally centered -->
+<main class="p-4">
+    <!-- Click to hide log that keeps whitespace -->
+    <div class="container mx-auto">
+        <h1 class="p-4 text-2xl font-bold">Controls</h1>
+        <div class="bg-gray-800 text-white shadow-md rounded-lg overflow-hidden">
+            <div id="controlsContainer" class="p-4">
+                <p>Nothing here yet.</p>
+            </div>
+        </div>
+
+        <h1 class="p-4 text-2xl font-bold">Settings</h1>
+        <div class="bg-gray-800 text-white shadow-md rounded-lg overflow-hidden">
+            <div class="from-gray-800 to-gray-800 hover:from-indigo-800 hover:to-slate-800 bg-gradient-to-r transition">
+                <div class="p-4  cursor-pointer" onclick="toggleRow('row1')">
+                    <h2 class="text-lg font-semibold">Internal Settings</h2>
+                </div>
+                <div id="row1" class="p-4">
+                    <label for="hostname" class="mb-2">Hostname:</label>
+                    <form action="/configure" method="post" class="card">
+                        <input type="text" id="hostname" name="hostname"
+                               class="mt-1 block w-full p-2 border text-white bg-slate-900 border-slate-950 rounded"
+                               value="{{hostname}}">
+                        <br>
+                        <input type="submit" value="Apply" class="cursor-pointer bg-indigo-500 text-white p-3 rounded">
+                    </form>
+                </div>
+            </div>
+            <div  class="from-gray-800 to-gray-800 hover:from-indigo-800 hover:to-slate-800 bg-gradient-to-r transition">
+                <div class="p-4  border-t border-gray-700 cursor-pointer" onclick="toggleRow('row2')">
+                    <h2 class="text-lg font-semibold">Network Configuration</h2>
+                </div>
+                <div id="row2" class="p-4">
+                    <form action="/configure" method="post" class="card">
+                        <label for="ssid">Wi-Fi Network:</label>
+                        <select id="ssid" name="ssid"
+                                class="mt-1 block w-full p-2 border text-white bg-slate-900 border-slate-950 rounded">
+                            {{ "".join([f"<option value=\"{net[0].decode('utf-8')}\">{net[0].decode('utf-8')}</option>" for net in networks_list]) }}
+                        </select>
+                        <br>
+                        <label for="password" class="mb-2">Password:</label>
+                        <input type="password" id="password" name="password" autocomplete="current-password"
+                               class="mt-1 block w-full p-2 border text-white bg-slate-900 border-slate-950 rounded">
+                        <br>
+                        <input type="submit" value="Apply" class="cursor-pointer bg-indigo-500 text-white p-3 rounded">
+                    </form>
+                </div>
+            </div>
+            <div  class="from-gray-800 to-gray-800 hover:from-indigo-800 hover:to-slate-800 bg-gradient-to-r transition">
+                <div class="p-4 border-t border-gray-700 cursor-pointer" onclick="toggleRow('row3')">
+                    <h2 class="text-lg font-semibold">Internal Log</h2>
+                </div>
+                <div id="row3" class="p-4 hidden">
+                    <code id="log" class="p-3 bg-black overflow-x-auto rounded text-green-500">{{networks}}</code>
+                    <!-- button to download the contents of #log as txt file -->
+                    <br>
+                    <button onclick="downloadLog()" class="cursor-pointer bg-indigo-500 text-white p-2 rounded">Download
+                        Log
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+</body>
+</html>
