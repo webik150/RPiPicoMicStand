@@ -7,23 +7,48 @@ from machine import Pin, Timer
 import os
 import uasyncio
 
-from mdns_client import Client
-from mdns_client.responder import Responder
-
-
 # server
 from phew import logging, template, server, access_point, dns, connect_to_wifi
 from phew.template import  render_template
 from phew.server import redirect, Response
 
+# Function to log data to the file
+def log_data(data):
+    with open("micstandlog.txt", "a") as file:
+        file.write(f"[{utime.time()}] {str(data)}\n")
+        print(data)
+
+config = {
+    'wifi' :{
+        'ssid': None,
+        'password': None
+    },
+    'hostname': 'rpicostand',
+    'motors': {
+        'x': {
+            'steps_per_revolution': 800,
+            'step_duration': 1000
+        },
+        'y': {
+            'steps_per_revolution': 800,
+            'step_duration': 1000
+        },
+        'z': {
+            'steps_per_revolution': 800,
+            'step_duration': 1000
+        }
+    }
+}
+
 utime.sleep(3)
 
-dir_pin = Pin(2, Pin.OUT)
-step_pin = Pin(1, Pin.OUT)
-steps_per_revolution = 200
+dir_pin = Pin(15, Pin.OUT)
+step_pin = Pin(0, Pin.OUT)
+steps_per_revolution = 800
 
 # Initialize timer
 tim = Timer()
+
 
 def step(t):
     global step_pin
@@ -42,6 +67,7 @@ def loop():
 
         # Spin motor slowly
         rotate_motor(2000)
+        log_data("Rotating motor clockwise")
         utime.sleep_ms(steps_per_revolution)
         tim.deinit()  # stop the timer
         utime.sleep(1)
@@ -51,11 +77,54 @@ def loop():
 
         # Spin motor quickly
         rotate_motor(1000)
+        log_data("Rotating motor counterclockwise")
         utime.sleep_ms(steps_per_revolution)
         tim.deinit()  # stop the timer
         utime.sleep(1)
 
-loop()
+#loop()
+
+dir_pin_x = Pin(15, Pin.OUT)
+step_pin_x = Pin(0, Pin.OUT)
+dir_pin_y = Pin(2, Pin.OUT)
+step_pin_y = Pin(3, Pin.OUT)
+dir_pin_z = Pin(4, Pin.OUT)
+step_pin_z = Pin(5, Pin.OUT)
+
+# Initialize timer
+motor_timer_x = Timer()
+motor_timer_y = Timer()
+motor_timer_z = Timer()
+
+def step_x(t):
+    global step_pin_x
+    step_pin_x.value(not step_pin_x.value())
+def step_y(t):
+    global step_pin_y
+    step_pin_y.value(not step_pin_y.value())
+def step_z(t):
+    global step_pin_z
+    step_pin_z.value(not step_pin_z.value())
+
+
+def rotate_motor_x():
+    global config
+    global motor_timer_x
+    # Set up timer for stepping
+    log_data(f"Rotating motor X with {config['motors']['x']['step_duration']} step duration")
+    motor_timer_x.init(freq=1000000 // config['motors']['x']['step_duration'], mode=Timer.PERIODIC, callback=step_x)
+
+def rotate_motor_y():
+    global config
+    global motor_timer_y
+    # Set up timer for stepping
+    motor_timer_y.init(freq=1000000 // config['motors']['y']['step_duration'], mode=Timer.PERIODIC, callback=step_y)
+
+def rotate_motor_z():
+    global config
+    global motor_timer_z
+    # Set up timer for stepping
+    motor_timer_z.init(freq=1000000 // config['motors']['z']['step_duration'], mode=Timer.PERIODIC, callback=step_z)
 
 # set machine hostname to DOMAIN
 network.hostname("rpicostand")
@@ -123,6 +192,60 @@ def hotspot(request):
     #return render_template("index.html", disco = str(disco))
     return index_page()
 
+@server.route("/move", methods=["POST"])
+def move_motor(request):
+    motor = request.data.get("axis", None)
+    direction = request.data.get("direction", None)
+    speed = request.data.get("speed", None)
+
+    if motor == 'x':
+        dir_pin = dir_pin_x
+        timer = motor_timer_x
+    elif motor == 'y':
+        dir_pin = dir_pin_y
+        timer = motor_timer_y
+    elif motor == 'z':
+        dir_pin = dir_pin_z
+        timer = motor_timer_z
+    else:
+        log_data(f"Invalid motor: {motor}")
+        return Response("Invalid motor", status=400, headers={"Content-Type": "text/html"})
+
+    if speed == 0:
+        timer.deinit()
+        return Response("Motor stopped", status=200, headers={"Content-Type": "text/html"})
+
+    if direction == 'cw':
+        dir_pin.value(1)
+    elif direction == 'ccw':
+        dir_pin.value(0)
+    else:
+        log_data(f"Invalid direction: {direction}")
+        return Response("Invalid direction", status=400, headers={"Content-Type": "text/html"})
+
+
+    if speed == 1:
+        step_duration = 2000
+    elif speed == 2:
+        step_duration = 1000
+    elif speed == 3:
+        step_duration = 500
+    else:
+        log_data(f"Invalid speed: {speed}")
+        return Response("Invalid speed", status=400, headers={"Content-Type": "text/html"})
+
+    set_motor_config(motor, None, step_duration)
+
+    # Set up timer for stepping
+    if motor == 'x':
+        rotate_motor_x()
+    elif motor == 'y':
+        rotate_motor_y()
+    elif motor == 'z':
+        rotate_motor_z()
+
+    return Response(f"Motor {motor} moved", status=200, headers={"Content-Type": "text/html"})
+
 #@server.catchall()
 def catch_all(request):
     """ Catch and redirect requests """
@@ -169,38 +292,33 @@ async def blink_led_internal(times, interval_ms):
         await uasyncio.sleep_ms(interval_ms)
 
 
-def check_if_should_blink():
-    global nextBlink
-    if nextBlink is not None:
-        times = nextBlink['times']
-        interval = nextBlink['interval']
-        if 'pause_interval' in nextBlink:
-            pause_interval = nextBlink['pause_interval']
-            blink_led_internal(times, interval)
-            utime.sleep_ms(pause_interval)
-        else:
-            nextBlink = None
-            blink_led_internal(times, interval)
-
-
-# thread function that will check if the LED should blink
-def check_if_should_blink_thread():
-    while True:
-        check_if_should_blink()
-        utime.sleep_ms(50)
+def save_configuration():
+    global config
+    with open("config.json", "w") as f:
+        ujson.dump(config, f)
 
 
 # Save Wi-Fi credentials to a file
 def save_wifi_credentials(ssid, password):
-    data = {"ssid": ssid, "password": password}
-    with open("wifi_config.json", "w") as f:
-        ujson.dump(data, f)
+    global config
+    config['wifi'] = {"ssid": ssid, "password": password}
+    save_configuration()
 
+def save_hostname(hostname):
+    global config
+    config['hostname'] = hostname
+    save_configuration()
+
+def set_motor_config(motor, steps_per_revolution, step_duration):
+    global config
+    spr = config['motors'][motor]['steps_per_revolution']
+    sd = config['motors'][motor]['step_duration']
+    config['motors'][motor] = {"steps_per_revolution": steps_per_revolution if not None else spr, "step_duration": step_duration if not None else sd}
 
 # Load Wi-Fi credentials from file
-def load_wifi_credentials():
+def load_configuration():
     try:
-        with open("wifi_config.json", "r") as f:
+        with open("config.json", "r") as f:
             return ujson.load(f)
     except OSError:
         return None
@@ -252,6 +370,10 @@ def scan_networks():
 
 
 def try_connect_to_wifi(ssid, password):
+    if not ssid or not password:
+        log_data("No Wi-Fi credentials found.")
+        return False
+
     blink_led(50, 200)
 
     ip = connect_to_wifi(ssid, password, 10)
@@ -284,11 +406,7 @@ def try_connect_to_wifi(ssid, password):
         utime.sleep_ms(1000)
         return False
 
-# Function to log data to the file
-def log_data(data):
-    with open("micstandlog.txt", "a") as file:
-        file.write(f"[{utime.time()}] {str(data)}\n")
-        print(data)
+
 
 # Function to read the log file
 def read_log():
@@ -303,8 +421,23 @@ delete_log_on_startup()
 log_data("Starting up...")
 #blinking thread
 blink_led(5, 100)
-wifi_credentials = load_wifi_credentials()
+tmp_config = load_configuration()
+
+if tmp_config:
+    config = tmp_config
+    log_data("Configuration loaded.")
+
+wifi_credentials = config['wifi']
 scan_networks()
+
+
+# test motors
+# rotate_motor_x()
+rotate_motor_x()
+utime.sleep_ms(1000)
+motor_timer_x.deinit()
+# rotate_motor_y()
+# rotate_motor_z()
 
 
 if wifi_credentials:
