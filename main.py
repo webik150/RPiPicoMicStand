@@ -3,9 +3,13 @@ import ujson
 import utime
 import network
 import time
-from machine import Pin
+from machine import Pin, Timer
 import os
-import asyncio
+import uasyncio
+
+from mdns_client import Client
+from mdns_client.responder import Responder
+
 
 # server
 from phew import logging, template, server, access_point, dns, connect_to_wifi
@@ -14,9 +18,48 @@ from phew.server import redirect, Response
 
 utime.sleep(3)
 
+dir_pin = Pin(2, Pin.OUT)
+step_pin = Pin(1, Pin.OUT)
+steps_per_revolution = 200
+
+# Initialize timer
+tim = Timer()
+
+def step(t):
+    global step_pin
+    step_pin.value(not step_pin.value())
+
+
+def rotate_motor(delay):
+    # Set up timer for stepping
+    tim.init(freq=1000000 // delay, mode=Timer.PERIODIC, callback=step)
+
+
+def loop():
+    while True:
+        # Set motor direction clockwise
+        dir_pin.value(1)
+
+        # Spin motor slowly
+        rotate_motor(2000)
+        utime.sleep_ms(steps_per_revolution)
+        tim.deinit()  # stop the timer
+        utime.sleep(1)
+
+        # Set motor direction counterclockwise
+        dir_pin.value(0)
+
+        # Spin motor quickly
+        rotate_motor(1000)
+        utime.sleep_ms(steps_per_revolution)
+        tim.deinit()  # stop the timer
+        utime.sleep(1)
+
+loop()
+
 # set machine hostname to DOMAIN
-network.hostname("rpistand")
-DOMAIN = f"{network.hostname()}.local" # This is the address that is shown on the Captive Portal
+network.hostname("rpicostand")
+#DOMAIN = f"{network.hostname()}.local" # This is the address that is shown on the Captive Portal
 
 def delete_log_on_startup():
     try:
@@ -59,7 +102,7 @@ def configure(request):
             reboot_required = True
 
         if reboot_required:
-            asyncio.create_task(restart_after_while())
+            uasyncio.create_task(restart_after_while())
             return Response("Credentials saved! The machine will now restart.", status=200, headers={"Content-Type": "text/html"})
         else:
             return Response("Changes saved", status=200, headers={"Content-Type": "text/html"})
@@ -88,15 +131,15 @@ def catch_all(request):
 
 # set LED pin function
 async def set_led_internal(state: bool):
-    await asyncio.sleep_ms(10)
+    await uasyncio.sleep_ms(10)
     Pin("LED", Pin.OUT)(state)
 
 # set LED pin function
 def set_led(state: bool):
-    asyncio.create_task(set_led_internal(state))
+    uasyncio.create_task(set_led_internal(state))
 
 async def restart_after_while():
-    await asyncio.sleep_ms(5000)
+    await uasyncio.sleep_ms(5000)
     sys.exit()
 
 set_led(False)
@@ -105,7 +148,7 @@ networks = []
 
 # function to set the Next Blink
 def blink_led(times, interval):
-    asyncio.create_task(blink_led_internal(times, interval))
+    uasyncio.create_task(blink_led_internal(times, interval))
     global nextBlink
     nextBlink = {"times": times, "interval": interval}
 
@@ -121,9 +164,9 @@ async def blink_led_internal(times, interval_ms):
     await set_led_internal(False)
     for i in range(times):
         await set_led_internal(True)
-        await asyncio.sleep_ms(interval_ms)
+        await uasyncio.sleep_ms(interval_ms)
         await set_led_internal(False)
-        await asyncio.sleep_ms(interval_ms)
+        await uasyncio.sleep_ms(interval_ms)
 
 
 def check_if_should_blink():
@@ -210,11 +253,30 @@ def scan_networks():
 
 def try_connect_to_wifi(ssid, password):
     blink_led(50, 200)
+
     ip = connect_to_wifi(ssid, password, 10)
     if ip:
         log_data(f"Connected to Wi-Fi. IP address: {ip}")
         set_led(True)
         utime.sleep_ms(1000)
+
+        # loop = uasyncio.get_event_loop()
+        # client = Client(ip)
+        # responder = Responder(
+        #     client,
+        #     own_ip=lambda: ip,
+        #     host=lambda: "my-awesome-microcontroller-{}".format(responder.generate_random_postfix()),
+        # )
+        #
+        # def announce_service():
+        #     responder.advertise("_http", "_tcp", port=80,
+        #                         data={"some": "metadata", "for": ["my", "service"]})
+        #
+        # log_data("Starting mDNS service...")
+        # announce_service()
+        # loop.run_forever()
+
+
         return True
     else:
         log_data("Failed to connect to Wi-Fi.")
