@@ -34,6 +34,27 @@
             document.body.removeChild(a);
         }
 
+        function stop() {
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', '/stop', true);
+            xhr.setRequestHeader('Content-Type', 'application/json');
+            xhr.send(JSON.stringify({}));
+            //logUpdate = setInterval(updateLog, 1000);
+        }
+
+        function updateLog() {
+            var xhr = new XMLHttpRequest();
+            xhr.open('GET', '/log', true);
+            xhr.onreadystatechange = function () {
+                if (xhr.readyState === 4 && xhr.status === 200) {
+                    document.getElementById('log').innerText = xhr.responseText;
+                }
+            };
+            xhr.send();
+        }
+
+        //var logUpdate = setInterval(updateLog, 1000);
+
         function move(axis, direction, speed) {
             if (axis === 'all') {
                 // if the axis is 'all', send a request for each axis
@@ -42,7 +63,7 @@
                 move('z', direction, 0);
                 return;
             }
-
+            //clearInterval(logUpdate);
             // create a new XMLHttpRequest object
             var xhr = new XMLHttpRequest();
             // set the request method to POST
@@ -52,12 +73,44 @@
             // set the request body to a JSON string with the axis, direction, and speed
             xhr.send(JSON.stringify({axis: axis, direction: direction, speed: speed}));
         }
+
+        function onconfigure(event) {
+            event.preventDefault(); // Prevent the default form submission
+
+            let form = event.target; // Get the form element
+            let formData = new FormData(form); // Create a FormData object
+
+            let xhr = new XMLHttpRequest();
+            xhr.open('POST', form.action, true); // Set the request method and URL
+            xhr.onreadystatechange = function () {
+                if (xhr.readyState === 4 && xhr.status === 200) {
+                    alert('Configuration updated successfully');
+                } else if (xhr.readyState === 4) {
+                    alert('Failed to update configuration');
+                }
+            };
+            xhr.send(formData); // Send the form data
+        }
     </script>
     <style>
         #log {
             white-space: pre;
             display: block;
         }
+
+        .container-arrow {
+            position: absolute;
+            width: 2em;
+            top: 1rem;
+            right: 1.5em;
+            transform: rotateX(180deg);
+            transition: 0.3s;
+        }
+
+        .container-arrow:has(+ * + div.hidden) {
+            transform: rotateX(0deg);
+        }
+
     </style>
 </head>
 <body class="text-white min-h-screen bg-gradient-to-b from-gray-900 to-indigo-950 bg-contain">
@@ -68,7 +121,7 @@
     <small class="text-gray-400">{{current_mode}}</small>
 </header>
 <!-- Main content, horizontally centered -->
-<main class="p-4" onmouseup="move('all', '', 0)">
+<main class="p-4" onmouseup="stop()">
     <!-- Click to hide log that keeps whitespace -->
     <div class="container mx-auto">
         <h1 class="p-4 text-2xl font-bold">Controls</h1>
@@ -80,66 +133,127 @@
                     <div class="flex flex-col">
                         <h2 class="text-lg font-semibold">X Axis</h2>
                         <div class="flex flex-row">
-                            <button onmousedown="move('x', 'ccw', 3)" class="m-1 cursor-pointer bg-indigo-500 text-white p-2 rounded">&lt;&lt;&lt;</button>
-                            <button onmousedown="move('x', 'ccw', 2)" class="m-1 cursor-pointer bg-indigo-500 text-white p-2 rounded">&lt;&lt;</button>
-                            <button onmousedown="move('x', 'ccw', 1)" class="m-1 cursor-pointer bg-indigo-500 text-white p-2 rounded">&lt;</button>
+                            <button onmousedown="move('x', 'ccw', 3)"
+                                    class="m-1 cursor-pointer bg-indigo-500 text-white p-2 rounded">&lt;&lt;&lt;
+                            </button>
+                            <button onmousedown="move('x', 'ccw', 2)"
+                                    class="m-1 cursor-pointer bg-indigo-500 text-white p-2 rounded">&lt;&lt;
+                            </button>
+                            <button onmousedown="move('x', 'ccw', 1)"
+                                    class="m-1 cursor-pointer bg-indigo-500 text-white p-2 rounded">&lt;
+                            </button>
 
-                            <button onmousedown="move('x', 'cw', 1)" class="m-1 cursor-pointer bg-indigo-500 text-white p-2 rounded">&gt;</button>
-                            <button onmousedown="move('x', 'cw', 2)" class="m-1 cursor-pointer bg-indigo-500 text-white p-2 rounded">&gt;&gt;</button>
-                            <button onmousedown="move('x', 'cw', 3)" class="m-1 cursor-pointer bg-indigo-500 text-white p-2 rounded">&gt;&gt;&gt;</button>
+                            <button onmousedown="move('x', 'cw', 1)"
+                                    class="m-1 cursor-pointer bg-indigo-500 text-white p-2 rounded">&gt;
+                            </button>
+                            <button onmousedown="move('x', 'cw', 2)"
+                                    class="m-1 cursor-pointer bg-indigo-500 text-white p-2 rounded">&gt;&gt;
+                            </button>
+                            <button onmousedown="move('x', 'cw', 3)"
+                                    class="m-1 cursor-pointer bg-indigo-500 text-white p-2 rounded">&gt;&gt;&gt;
+                            </button>
                         </div>
                     </div>
                     <div class="flex flex-col">
                         <h2 class="text-lg font-semibold">Y Axis</h2>
                         <div class="flex flex-row">
-                            <button onmousedown="move('y', 'ccw', 3)" class="m-1 cursor-pointer bg-indigo-500 text-white p-2 rounded">&lt;&lt;&lt;</button>
-                            <button onmousedown="move('y', 'ccw', 2)" class="m-1 cursor-pointer bg-indigo-500 text-white p-2 rounded">&lt;&lt;</button>
-                            <button onmousedown="move('y', 'ccw', 1)" class="m-1 cursor-pointer bg-indigo-500 text-white p-2 rounded">&lt;</button>
+                            <button onmousedown="move('y', 'ccw', 3)"
+                                    class="m-1 cursor-pointer bg-indigo-500 text-white p-2 rounded">&lt;&lt;&lt;
+                            </button>
+                            <button onmousedown="move('y', 'ccw', 2)"
+                                    class="m-1 cursor-pointer bg-indigo-500 text-white p-2 rounded">&lt;&lt;
+                            </button>
+                            <button onmousedown="move('y', 'ccw', 1)"
+                                    class="m-1 cursor-pointer bg-indigo-500 text-white p-2 rounded">&lt;
+                            </button>
 
-                            <button onmousedown="move('y', 'cw', 1)" class="m-1 cursor-pointer bg-indigo-500 text-white p-2 rounded">&gt;</button>
-                            <button onmousedown="move('y', 'cw', 2)" class="m-1 cursor-pointer bg-indigo-500 text-white p-2 rounded">&gt;&gt;</button>
-                            <button onmousedown="move('y', 'cw', 3)" class="m-1 cursor-pointer bg-indigo-500 text-white p-2 rounded">&gt;&gt;&gt;</button>
+                            <button onmousedown="move('y', 'cw', 1)"
+                                    class="m-1 cursor-pointer bg-indigo-500 text-white p-2 rounded">&gt;
+                            </button>
+                            <button onmousedown="move('y', 'cw', 2)"
+                                    class="m-1 cursor-pointer bg-indigo-500 text-white p-2 rounded">&gt;&gt;
+                            </button>
+                            <button onmousedown="move('y', 'cw', 3)"
+                                    class="m-1 cursor-pointer bg-indigo-500 text-white p-2 rounded">&gt;&gt;&gt;
+                            </button>
                         </div>
                     </div>
                     <div class="flex flex-col">
-                    <h2 class="text-lg font-semibold">Z Axis</h2>
-                    <div class="flex flex-row">
-                        <button onmousedown="move('z', 'ccw', 3)" class="m-1 cursor-pointer bg-indigo-500 text-white p-2 rounded">&lt;&lt;&lt;</button>
-                        <button onmousedown="move('z', 'ccw', 2)" class="m-1 cursor-pointer bg-indigo-500 text-white p-2 rounded">&lt;&lt;</button>
-                        <button onmousedown="move('z', 'ccw', 1)" class="m-1 cursor-pointer bg-indigo-500 text-white p-2 rounded">&lt;</button>
+                        <h2 class="text-lg font-semibold">Z Axis</h2>
+                        <div class="flex flex-row">
+                            <button onmousedown="move('z', 'ccw', 3)"
+                                    class="m-1 cursor-pointer bg-indigo-500 text-white p-2 rounded">&lt;&lt;&lt;
+                            </button>
+                            <button onmousedown="move('z', 'ccw', 2)"
+                                    class="m-1 cursor-pointer bg-indigo-500 text-white p-2 rounded">&lt;&lt;
+                            </button>
+                            <button onmousedown="move('z', 'ccw', 1)"
+                                    class="m-1 cursor-pointer bg-indigo-500 text-white p-2 rounded">&lt;
+                            </button>
 
-                        <button onmousedown="move('z', 'cw', 1)" class="m-1 cursor-pointer bg-indigo-500 text-white p-2 rounded">&gt;</button>
-                        <button onmousedown="move('z', 'cw', 2)" class="m-1 cursor-pointer bg-indigo-500 text-white p-2 rounded">&gt;&gt;</button>
-                        <button onmousedown="move('z', 'cw', 3)" class="m-1 cursor-pointer bg-indigo-500 text-white p-2 rounded">&gt;&gt;&gt;</button>
+                            <button onmousedown="move('z', 'cw', 1)"
+                                    class="m-1 cursor-pointer bg-indigo-500 text-white p-2 rounded">&gt;
+                            </button>
+                            <button onmousedown="move('z', 'cw', 2)"
+                                    class="m-1 cursor-pointer bg-indigo-500 text-white p-2 rounded">&gt;&gt;
+                            </button>
+                            <button onmousedown="move('z', 'cw', 3)"
+                                    class="m-1 cursor-pointer bg-indigo-500 text-white p-2 rounded">&gt;&gt;&gt;
+                            </button>
+                        </div>
                     </div>
-                </div>
                 </div>
             </div>
         </div>
 
         <h1 class="p-4 text-2xl font-bold">Settings</h1>
         <div class="bg-gray-800 text-white shadow-md rounded-lg overflow-hidden">
-            <div class="from-gray-800 to-gray-800 hover:from-indigo-800 hover:to-slate-800 bg-gradient-to-r transition">
+            <div class="relative from-gray-800 to-gray-800 hover:from-indigo-800 hover:to-slate-800 bg-gradient-to-r transition">
+                <svg class="container-arrow" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M6 9l6 6 6-6"></path>
+                </svg>
                 <div class="p-4  cursor-pointer" onclick="toggleRow('row1')">
                     <h2 class="text-lg font-semibold">Internal Settings</h2>
                 </div>
-                <div id="row1" class="p-4">
+                <div id="row1" class="p-4 hidden">
                     <label for="hostname" class="mb-2">Hostname:</label>
-                    <form action="/configure" method="post" class="card">
+                    <form action="/configure" method="post" class="card" onsubmit="onconfigure(event)">
                         <input type="text" id="hostname" name="hostname"
                                class="mt-1 block w-full p-2 border text-white bg-slate-900 border-slate-950 rounded"
                                value="{{hostname}}">
                         <br>
+                        <!-- text inputs to set individual X,Y,Z motor speeds -->
+                        <label for="x_speed" class="mb-2">X Speed:</label>
+                        <input type="text" id="x_speed" name="x_speed"
+                               class="mt-1 block w-full p-2 border text-white bg-slate-900 border-slate-950 rounded"
+                               value="{{x_speed}}">
+                        <br>
+                        <label for="y_speed" class="mb-2">Y Speed:</label>
+                        <input type="text" id="y_speed" name="y_speed"
+                               class="mt-1 block w-full p-2 border text-white bg-slate-900 border-slate-950 rounded"
+                               value="{{y_speed}}">
+                        <br>
+                        <label for="z_speed" class="mb-2">Z Speed:</label>
+                        <input type="text" id="z_speed" name="z_speed"
+                               class="mt-1 block w-full p-2 border text-white bg-slate-900 border-slate-950 rounded"
+                               value="{{z_speed}}">
+                        <br>
+
                         <input type="submit" value="Apply" class="cursor-pointer bg-indigo-500 text-white p-3 rounded">
                     </form>
                 </div>
             </div>
-            <div  class="from-gray-800 to-gray-800 hover:from-indigo-800 hover:to-slate-800 bg-gradient-to-r transition">
+            <div class="relative from-gray-800 to-gray-800 hover:from-indigo-800 hover:to-slate-800 bg-gradient-to-r transition">
+                <svg class="container-arrow" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M6 9l6 6 6-6"></path>
+                </svg>
                 <div class="p-4  border-t border-gray-700 cursor-pointer" onclick="toggleRow('row2')">
                     <h2 class="text-lg font-semibold">Network Configuration</h2>
                 </div>
-                <div id="row2" class="p-4">
-                    <form action="/configure" method="post" class="card">
+                <div id="row2" class="p-4 hidden">
+                    <form action="/configure" method="post" class="card" onsubmit="onconfigure(event)">
                         <label for="ssid">Wi-Fi Network:</label>
                         <select id="ssid" name="ssid"
                                 class="mt-1 block w-full p-2 border text-white bg-slate-900 border-slate-950 rounded">
@@ -154,17 +268,27 @@
                     </form>
                 </div>
             </div>
-            <div  class="from-gray-800 to-gray-800 hover:from-indigo-800 hover:to-slate-800 bg-gradient-to-r transition">
+            <div class="relative from-gray-800 to-gray-800 hover:from-indigo-800 hover:to-slate-800 bg-gradient-to-r transition">
+                <svg class="container-arrow" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M6 9l6 6 6-6"></path>
+                </svg>
                 <div class="p-4 border-t border-gray-700 cursor-pointer" onclick="toggleRow('row3')">
                     <h2 class="text-lg font-semibold">Internal Log</h2>
                 </div>
                 <div id="row3" class="p-4 hidden">
-                    <code id="log" class="p-3 bg-black overflow-x-auto rounded text-green-500">{{networks}}</code>
+                    <code id="log" class="p-3 bg-black overflow-x-auto rounded text-green-500">{{device_log}}</code>
                     <!-- button to download the contents of #log as txt file -->
                     <br>
-                    <button onclick="downloadLog()" class="cursor-pointer bg-indigo-500 text-white p-2 rounded">Download
+                    <div class="flex">
+                        <button onclick="downloadLog()" class="cursor-pointer bg-indigo-500 text-white p-2 rounded">Download
                         Log
                     </button>
+                        <button onclick="updateLog()" class="cursor-pointer bg-indigo-500 text-white p-2 rounded">Update
+                        Log
+                    </button>
+                    </div>
+
                 </div>
             </div>
         </div>
