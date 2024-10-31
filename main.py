@@ -12,10 +12,10 @@ from phew import logging, template, server, access_point, dns, connect_to_wifi
 from phew.template import render_template
 from phew.server import redirect, Response
 
+import display
+from display import LED_8SEG
 
 class JSON:
-
-
     @staticmethod
     def deserialize(obj, data):
         if not isinstance(data, dict):
@@ -134,6 +134,7 @@ class RPicoStand:
             'ssid': None,
             'password': None
         }
+        self.display = LED_8SEG()
 
     @staticmethod
     def serializable_fields():
@@ -156,6 +157,12 @@ class RPicoStand:
         except OSError:
             log_data(f"Failed to load configuration from {filename}")
 
+    def display_text(self, text, duration):
+        uasyncio.create_task(self.display.display_text(text, duration))
+
+    def display_rolling_text(self, text, duration_per_char, repeat=1, padding=True):
+        uasyncio.create_task(self.display.display_rolling_text(text, duration_per_char,repeat, padding))
+
 
 utime.sleep(3)
 rpicostand = RPicoStand()
@@ -169,8 +176,11 @@ log_data(rpicostand.motors['x'])
 
 # set machine hostname to DOMAIN
 network.hostname(rpicostand.hostname)
-
-
+#uasyncio.create_task(rpicostand.display.display_text("ON", 2))
+#uasyncio.create_task(rpicostand.display.display_text(" ", 2))
+#uasyncio.create_task(rpicostand.display.display_text("Fart", 4))
+#rpicostand.display.debug_infinite_loop()
+rpicostand.display_rolling_text("stand init", .5, 1)
 #DOMAIN = f"{network.hostname()}.local" # This is the address that is shown on the Captive Portal
 
 def delete_log_on_startup():
@@ -380,7 +390,7 @@ def save_configuration():
         f.write(js)
         f.flush()
         f.close()
-
+        rpicostand.display_rolling_text("config saved", .3, 1)
 
 # Save Wi-Fi credentials to a file
 def save_wifi_credentials(ssid, password):
@@ -457,6 +467,8 @@ def try_connect_to_wifi(ssid, password):
     ip = connect_to_wifi(ssid, password, 10)
     if ip:
         log_data(f"Connected to Wi-Fi. IP address: {ip}")
+        rpicostand.display_rolling_text("connected", .3)
+        rpicostand.display_rolling_text(f"{ip}", .5, 5)
         set_led(True)
         utime.sleep_ms(1000)
         return True
@@ -491,11 +503,15 @@ if rpicostand.wifi['ssid'] and rpicostand.wifi['password']:
     if not success:
         blink_led(20, 50)
         log_data("Failed to connect to Wi-Fi. Starting pairing mode...")
+        rpicostand.display_rolling_text("internet error", .3, 1)
+        rpicostand.display_rolling_text("ap start", .3, 2)
         start_pairing_mode()
     else:
         blink_led(3, 500)
         start_work_mode()
 else:
     log_data("No Wi-Fi credentials found. Starting pairing mode...")
+    rpicostand.display_rolling_text("internet error", .3, 1)
+    rpicostand.display_rolling_text("ap start", .3, 2)
     blink_led(20, 50)
     start_pairing_mode()

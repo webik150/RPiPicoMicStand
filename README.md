@@ -1,44 +1,32 @@
-# RPiPicoMicStand
+# RaPiPiMiSt
+-# Raspberry Pi Pico Microphone Stand
 
-NOTE: This is VERY WIP, mostly in idea phase.
+This project aims to create a motorized microphone stand using old NEMA-17 stepper motors from Prusa MK3, controllable through a LAN web server hosted on a RPi Pico W using MicroPython.
 
-I don't have a better name rn, subject to change (suggestions welcome).
+The software part operates in two modes:
 
-This project aims to create a motorized microphone stand using old NEMA-17 stepper motors from Prusa MK3, controllable through a LAN web server hosted on a RPi Pico W using MicroPython. The hardware part rn works on a breadboard, once I design some PCB it'll also be stored here. 
-
-The software part (not implemented yet) operates in two modes:
-
-- **Pairing Mode**: When no Wi-Fi credentials are available at startup, the device creates a Wi-Fi Access Point (AP) and serves as a captive portal to allow users to configure the Wi-Fi settings.
+- **Pairing Mode**: When no Wi-Fi credentials are available at startup, or wi-fi connection is unsuccessful, the device creates a Wi-Fi Access Point (AP) and serves as a captive portal to allow users to configure the Wi-Fi settings. It is also possible to control the stand in this way in case you need to record in the field without any wifi for whatever reason.
 - **Work Mode**: Once Wi-Fi credentials are saved, the device connects to the saved network and serves a control website on the local network.
 
-## HW Features
+## Features
 - Movement on X and Y axes (Forward/Back and Left/Right)
 - Mic rotation on one axis
+- Optional 8SEG display for debugging, info, stuff.
 - Powered by 12V, idk how many A will be needed yet.
 - I'll try to make as much of the actual structure 3D printable
-
-## SW Features
-1. **Pairing Mode**:
-   - Automatically activates if no Wi-Fi credentials are saved or (hopefully) by holding the BOOTSEL button for 10s after bootup.
-   - Creates an AP with a preset SSID and password.
-   - Acts as a captive portal for users to select which Wi-Fi network to join.
-   - Scans for available networks and allows the user to select one and input the password.
-
-2. **Work Mode**:
-   - After successful Wi-Fi configuration, the device connects to the network.
-   - Serves a local web page with controls to interact with the microphone stand.
-   - Technically this should also allow you to calibrate the stand and such (or maybe it should autocalibrate at start, but I feel like that might be dangerous if you just plug it in randomly by a mistake or whatever), but I'll see if I manage to figure out how Prusa auto-home works for XY axes.
-
-Alternativelly, the pairing mode could also have the controls directly, which would allow you to use the stand even without functional wifi (ig somewhere outside or at a venue).
+- The software side is just a HTML page that sends commands through AJAX rn.
 
 ## Requirements
 
 - **Hardware**:
-  - TODO
+  - PCB
+    - TODO: List of components
+  - \*RPi Pico 8SEG display
+  - Stand itself
+    - No idea yet.
 
 - **Software**:
   - MicroPython installed on the Pico W
-  - Thonny IDE (or any other Python IDE capable of uploading MicroPython scripts to the Pico W)
   - MicroPython modules:
     - `network` for Wi-Fi functionality
     - `socket` for HTTP server implementation
@@ -75,9 +63,9 @@ idk if this is correct, ChatGPT came up with these instructions and I haven't ha
 
 ## Usage
 
-### Pairing Mode
+### Pairing
 
-1. Connect to the Wi-Fi access point `RPi_Pico_Setup` with the password `12345678`.
+1. Connect to the Wi-Fi access point `RPiMicStand` with the password `12345678`.
 2. Your device (phone or computer) should automatically open a captive portal page.
 3. Select a network from the dropdown and enter the Wi-Fi password.
 4. Press "Apply" to save the credentials and switch to work mode.
@@ -88,15 +76,22 @@ idk if this is correct, ChatGPT came up with these instructions and I haven't ha
 2. Access the control page by navigating to the Pico's IP address in a web browser (use `wlan.ifconfig()` to find the IP).
 3. Use the sliders, buttons, and other controls on the page to interact with the Pico's GPIO pins or perform other tasks.
 
-## Example Screenshots
+## Pics
 
-**Pairing Mode Captive Portal**:
+**Control website**:
 
-![Captive Portal](./images/captive_portal_example.png)
+![Captive Portal](./images/website.jpg)
 
-**Work Mode Control Webpage**:
 
-![Work Mode Control Page](./images/work_mode_example.png)
+**PCB**:
+
+![PCB](./images/pcb.jpg)
+
+
+**Stand**:
+
+![Captive Portal](./images/stand.jpg)
+
 
 ## License
 
