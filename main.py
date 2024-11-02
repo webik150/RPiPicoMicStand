@@ -3,17 +3,105 @@ import ujson
 import utime
 import network
 import time
-from machine import Pin, Timer
+from machine import Pin, Timer, SPI, PWM
 import os
 import uasyncio
+import framebuf
+from ucollections import deque
 
 # server
 from phew import logging, template, server, access_point, dns, connect_to_wifi
 from phew.template import render_template
 from phew.server import redirect, Response
 
-import display
-from display import LED_8SEG
+class LED_8SEG():
+    def __init__(self):
+        self.displaying = False
+        self.rclk = Pin(20, Pin.OUT)
+        self.rclk(1)
+        self.pwr = Pin(21, Pin.OUT)
+        self.pwr(1)
+        #self.spi = SPI(0)
+        #self.spi = SPI(0, 1000_000)
+        self.spi = SPI(0, 10000_000, polarity=0, phase=0, sck=Pin(18), mosi=Pin(19), miso=None)
+        self.queue = deque((), 10)  # Queue with a maximum size of 10
+        self.THOUSANDS = 0xFE
+        self.HUNDREDS = 0xFD
+        self.TENS = 0xFB
+        self.UNITS = 0xF7
+        self.Dot = 0x80
+        self.positions = [self.THOUSANDS, self.HUNDREDS, self.TENS, self.UNITS]
+        self.char_to_code = {
+            '0': 0x3F, '1': 0x06, '2': 0x5B, '3': 0x4F, '4': 0x66,
+            '5': 0x6D, '6': 0x7D, '7': 0x07, '8': 0x7F, '9': 0x6F,
+            'A': 0x77, 'B': 0x7C, 'C': 0x39, 'D': 0x5E, 'E': 0x79,
+            'F': 0x71, 'G': 0x3D, 'H': 0x76, 'I': 0x06, 'J': 0x1E,
+            'L': 0x38, 'N': 0x54, 'O': 0x5C, 'P': 0x73, 'R': 0x50,
+            'T': 0x78, 'U': 0x3E, 'Y': 0x6E, ' ': 0x00, '.': 0x80,
+            'S': 0x6D
+        }
+
+    def get_code_from_char(self, char):
+        return self.char_to_code.get(char.upper(), 0x00)
+
+    '''
+    function: Send Command
+    parameter: 
+        Num: bit select
+        Seg：segment select       
+    Info:The data transfer
+    '''
+
+    def write_cmd(self, Num, Seg):
+        self.rclk(1)
+        self.spi.write(bytearray([Num]))
+        self.spi.write(bytearray([Seg]))
+        self.rclk(0)
+        utime.sleep(0.001)
+        self.rclk(1)
+
+    async def display_text(self, text, duration):
+        self.queue.append((text, duration, False))
+        await self._process_queue()
+
+    async def display_rolling_text(self, text, duration_per_char, repeat_times=1, padding=True):
+        if padding:
+            text = '    ' + text + '    '
+        for _ in range(repeat_times):
+            self.queue.append((text, duration_per_char, True))
+        await self._process_queue()
+
+    async def _process_queue(self):
+        if not self.displaying:
+            self.displaying = True
+            while self.queue:
+                text, duration, rolling = self.queue.popleft()
+                if rolling:
+                    for start in range(len(text) - 3):
+                        end_time = utime.ticks_add(utime.ticks_ms(), int(duration * 1000))
+                        while utime.ticks_diff(end_time, utime.ticks_ms()) > 0:
+                            for i in range(4):
+                                char = text[start + i]
+                                code = self.get_code_from_char(char)
+                                if start + i + 1 < len(text) and text[start + i + 1] == '.':
+                                    code |= 0x80  # Set the dot segment
+                                self.write_cmd(self.positions[i], code)
+                                await uasyncio.sleep(0.005)
+                else:
+                    end_time = utime.ticks_add(utime.ticks_ms(), int(duration * 1000))
+                    while utime.ticks_diff(end_time, utime.ticks_ms()) > 0:
+                        for i, char in enumerate(text):
+                            if i < 4:
+                                code = self.get_code_from_char(char)
+                                if i + 1 < len(text) and text[i + 1] == '.':
+                                    code |= 0x80  # Set the dot segment
+                                self.write_cmd(self.positions[i], code)
+                                await uasyncio.sleep(0.005)
+                    for i in range(4):
+                        self.write_cmd(self.positions[i], self.get_code_from_char(' '))
+            self.displaying = False
+
+
 
 class JSON:
     @staticmethod
@@ -86,6 +174,9 @@ class Motor:
         self.speeds = speeds
         self.timer = Timer()
         self.moving = False
+        self.enable_pin(0)
+        self.dir_pin(0)
+        self.step_pin(0)
 
     def set_direction(self, direction):
         self.dir_pin.value(1 if direction == 'cw' else 0)
@@ -125,10 +216,9 @@ class Motor:
 class RPicoStand:
     def __init__(self):
         self.motors = {
-            'x': Motor(dir_pin=Pin(15, Pin.OUT), step_pin=Pin(0, Pin.OUT), enable_pin=Pin(16, Pin.OUT, value=1)),
-            'y': Motor(Pin(2, Pin.OUT), Pin(3, Pin.OUT), Pin(4, Pin.OUT, value=1)),
-            'z': Motor(Pin(5, Pin.OUT), Pin(6, Pin.OUT), Pin(7, Pin.OUT, value=1))
-        }
+            'x': Motor(dir_pin=Pin(3, Pin.OUT), step_pin=Pin(4, Pin.OUT), enable_pin=Pin(5, Pin.OUT, value=1)),
+            'y': Motor(dir_pin=Pin(6, Pin.OUT), step_pin=Pin(7, Pin.OUT), enable_pin=Pin(8, Pin.OUT, value=1)),
+            'z': Motor(dir_pin=Pin(0, Pin.OUT), step_pin=Pin(1, Pin.OUT), enable_pin=Pin(2, Pin.OUT, value=1))}
         self.hostname = 'rpicostand'
         self.wifi = {
             'ssid': None,
