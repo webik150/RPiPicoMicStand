@@ -8,6 +8,10 @@ The software part operates in two modes:
 - **Pairing Mode**: When no Wi-Fi credentials are available at startup, or wi-fi connection is unsuccessful, the device creates a Wi-Fi Access Point (AP) and serves as a captive portal to allow users to configure the Wi-Fi settings. It is also possible to control the stand in this way in case you need to record in the field without any wifi for whatever reason.
 - **Work Mode**: Once Wi-Fi credentials are saved, the device connects to the saved network and serves a control website on the local network.
 
+
+### Updates
+- **2024-11-02**: PCB was tested out to be working so I added files for it along with pics. Feel free to have it made, I usually use JLCPCB for that. I also added an 8SEG display to the thing last minute, which means there's no connector for it on the PCB, however you can just solder 4 pins to the top of the Pico like in the pic below.
+
 ## Features
 - Movement on X and Y axes (Forward/Back and Left/Right)
 - Mic rotation on one axis
@@ -76,20 +80,40 @@ idk if this is correct, ChatGPT came up with these instructions and I haven't ha
 2. Access the control page by navigating to the Pico's IP address in a web browser (use `wlan.ifconfig()` to find the IP).
 3. Use the sliders, buttons, and other controls on the page to interact with the Pico's GPIO pins or perform other tasks.
 
+## PCB
+KiCAD files are in the `PCB` folder. It could definitely be made much smaller, I might make a v2 sometime just for the fuck of it, or if necessary. 
+
+Right now RaPiPiMiSt uses 14 GPIO pins (3 for each motor, 5 for the display).
+
+### Possible improvements (V2 Wishlist):
+  * Use SMD components instead of THT. It's just resistors and capacitors so nothing fancy.
+  * Get rid of the DIP switches and control the pins through Pico, there's enough PINS still.
+    * Should this even be configurable? I could theoretically hardwire it so that X/Y motors use 1/2 step and Z motor uses 1/16 step.
+    * If configurable, each motor would use 6 pins (23 total, which still fits). Alternatively only Z axis could be configurable.
+  * Add a connector for the display directly on the board
+  * Maybe switch over to an OLED display, which is cheaper, much more versatile and uses one less pin.
+    * Downside is I have to learn to make an UI for that, but it sounds fun.
+  * The power pin is made for a classic dupont pin rn, might be better to put it on the edge somewhere and make it use an actual on-board connector. Less wires.
+  * I limited myself to 2 layer PCB, but 4 layer one isn't actually that much more expensive and could make stuff much smaller.
+  * The A4988 is loud and has no stall detection. I could switch to a TMC2209 which is bit more expensive but would allow for automatic calibration and less pins used.
+  * Idk what the fail rate of these drivers is but they could be soldered to the board instead of using a socket.
+  * I could actually use vias instead of trying to go around everything lol.
+  * The pico could be soldered directly to the board without any headers
+
+RaPiPiMiSt PCB v01
+![Plain PCB](./images/pcb.jpg)
+Finished thing
+![Soldered PCB](./images/pcb2.jpg)
+
 ## Pics
 
 **Control website**:
-
+TODO
 ![Captive Portal](./images/website.jpg)
 
 
-**PCB**:
-
-![PCB](./images/pcb.jpg)
-
-
 **Stand**:
-
+TODO
 ![Captive Portal](./images/stand.jpg)
 
 
