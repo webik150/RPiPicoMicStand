@@ -1,0 +1,73 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*.pyo
+*.mpy
+
+# MicroPython specific
+boot.py
+main.py
+*.bin
+*.elf
+*.hex
+*.uf2
+*.map
+
+# Ignore Thonny-related files (if using Thonny IDE)
+.thonny/
+
+# Logs
+*.log
+
+# KiCAD files to ignore
+*.bak              # Backup files
+*.bck              # Older style backup files
+*.kicad_pcb-bak    # PCB file backups
+*.kicad_prl        # Project log files
+*.net              # Netlist files
+*.xml              # XML exports
+*.dsn              # Design files used in simulations
+*.ses              # Simulation session files
+*.json             # JSON exports for 3D models
+
+# KiCAD 3D model cache
+*.step
+*.stp
+*.wrl
+
+# KiCAD autorouter files
+*.dsn
+*.ses
+
+# Other KiCAD temp files
+fp-info-cache       # Footprint cache
+sym-lib-table       # Symbol library table
+fp-lib-table        # Footprint library table
+*.dcm               # Documentation files
+*.sch-bak           # Schematic backups
+
+# KiCAD backups folders
+*-backups/
+
+# Gerber and production files (generated outputs)
+*.gbr
+*.gtl
+*.gbl
+*.gts
+*.gbs
+*.gko
+*.drl
+*.gto
+*.gbo
+*.gm1
+*.csv
+
+# Ignore temporary editor files
+*.swp
+*.swo
+*.tmp
+*~
+
+# Ignore OS-specific files
+.DS_Store            # macOS
+Thumbs.db            # Windows
