@@ -71,3 +71,7 @@ fp-lib-table        # Footprint library table
 # Ignore OS-specific files
 .DS_Store            # macOS
 Thumbs.db            # Windows
+*.gtp
+*.gbp
+*.dxf
+*.zip
