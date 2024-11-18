@@ -3,16 +3,238 @@ import ujson
 import utime
 import network
 import time
-from machine import Pin, Timer, SPI, PWM
+from machine import Pin, Timer, SPI, PWM, I2C
 import os
 import uasyncio
 import framebuf
 from ucollections import deque
+from ssd1306 import SSD1306_I2C
+import urandom
+import math
 
 # server
 from phew import logging, template, server, access_point, dns, connect_to_wifi
 from phew.template import render_template
 from phew.server import redirect, Response
+
+
+def shuffle_list(lst):
+    """
+    Shuffle a list in place using urandom.
+
+    Parameters:
+        lst: The list to shuffle.
+    """
+    for i in range(len(lst) - 1, 0, -1):
+        # Generate a random index from 0 to i
+        j = urandom.getrandbits(16) % (i + 1)
+        # Swap elements at indices i and j
+        lst[i], lst[j] = lst[j], lst[i]
+
+def random_expanding_polygons(oled, duration_ms=1000, num=5, state=1):
+    """
+    Creates an expanding polygon ripple effect.
+
+    Parameters:
+        oled: The SSD1306 OLED object.
+        center_x: X-coordinate of the polygon's center.
+        center_y: Y-coordinate of the polygon's center.
+        duration_ms: Total duration of the effect in milliseconds.
+        sides: Number of sides of the polygon.
+        initial_rotation: Initial rotation angle in degrees.
+    """
+    width, height = oled.width, oled.height
+    max_radius = int(math.sqrt(width ** 2 + height ** 2))  # Maximum ripple distance
+    total_frames = max_radius  # One frame per radius step
+    frame_delay = duration_ms // total_frames  # Delay per frame in ms
+    frames_per_ms = -1
+    # if frame delay is less than 1, calculate the number of frames to draw per drawcall to stay within the max duration
+    if frame_delay < 1:
+        frames_per_ms = math.floor(1 / (duration_ms / total_frames))
+        frames_per_ms = 1
+
+    shapes  = []
+    for i in range(num):
+        initial_rotation = urandom.getrandbits(16) % 360
+        sides = urandom.getrandbits(16) % 8 + 3
+        initial_position = (urandom.getrandbits(16) % width, urandom.getrandbits(16) % height)
+        shapes.append((sides, initial_rotation, initial_position))
+
+    def calculate_polygon_vertices(cx, cy, radius, sides, rotation):
+        """Calculate the vertices of a polygon."""
+        vertices = []
+        angle_step = 360 / sides
+        for i in range(sides):
+            angle = math.radians(i * angle_step + rotation)  # Convert to radians
+            x = int(cx + radius * math.cos(angle))
+            y = int(cy + radius * math.sin(angle))
+            vertices.append((x, y))
+        return vertices
+
+    def draw_polygon(oled, sides, initial_rotation, initial_position, radius, state):
+        """Draw a polygon with the given parameters."""
+        # Calculate vertices for the current radius
+        vertices = calculate_polygon_vertices(initial_position[0], initial_position[1], radius, sides, initial_rotation)
+        # Draw the polygon by connecting vertices
+        for i in range(len(vertices)):
+            x1, y1 = vertices[i]
+            x2, y2 = vertices[(i + 1) % len(vertices)]
+            if state == -1:
+                oled.line(x1, y1, x2, y2, 0 if oled.pixel(x1, y1) else 1)
+            else:
+                oled.line(x1, y1, x2, y2, state)
+
+    frame_counter = 0
+    # Start the ripple effect
+    for radius in range(1, max_radius + 1):
+        # for each shape
+        # oled.fill(0)  # Clear the screen
+        for sides, initial_rotation, initial_position in shapes:
+            draw_polygon(oled, sides, initial_rotation, initial_position, radius, state)
+
+        oled.show()
+        if (frames_per_ms > 1 and frame_counter % frames_per_ms == 0) or frames_per_ms <= 1:
+            utime.sleep_ms(frame_delay)
+
+    # Clear the screen after the effect
+    #oled.fill(0)
+    #oled.show()
+
+
+def expanding_polygon(oled, center_x, center_y, duration_ms=1000, sides=6, initial_rotation=0):
+    """
+    Creates an expanding polygon ripple effect.
+
+    Parameters:
+        oled: The SSD1306 OLED object.
+        center_x: X-coordinate of the polygon's center.
+        center_y: Y-coordinate of the polygon's center.
+        duration_ms: Total duration of the effect in milliseconds.
+        sides: Number of sides of the polygon.
+        initial_rotation: Initial rotation angle in degrees.
+    """
+    width, height = oled.width, oled.height
+    max_radius = int(math.sqrt(width ** 2 + height ** 2))  # Maximum ripple distance
+    total_frames = max_radius  # One frame per radius step
+    frame_delay = duration_ms // total_frames  # Delay per frame in ms
+
+    def calculate_polygon_vertices(cx, cy, radius, sides, rotation):
+        """Calculate the vertices of a polygon."""
+        vertices = []
+        angle_step = 360 / sides
+        for i in range(sides):
+            angle = math.radians(i * angle_step + rotation)  # Convert to radians
+            x = int(cx + radius * math.cos(angle))
+            y = int(cy + radius * math.sin(angle))
+            vertices.append((x, y))
+        return vertices
+
+    # Start the ripple effect
+    for radius in range(1, max_radius + 1):
+        oled.fill(0)  # Clear the screen
+
+        # Calculate vertices for the current radius
+        vertices = calculate_polygon_vertices(center_x, center_y, radius, sides, initial_rotation)
+
+        # Draw the polygon by connecting vertices
+        for i in range(len(vertices)):
+            x1, y1 = vertices[i]
+            x2, y2 = vertices[(i + 1) % len(vertices)]  # Wrap around to the first vertex
+            oled.line(x1, y1, x2, y2, 1)
+
+        oled.show()
+        utime.sleep_ms(frame_delay)
+
+    # Clear the screen after the effect
+    oled.fill(0)
+    oled.show()
+
+def circular_lines(oled, center_x, center_y, duration_ms=1000):
+    """
+    Creates a circular ripple effect from a given center position.
+
+    Parameters:
+        oled: The SSD1306 OLED object.
+        center_x: X-coordinate of the ripple's center.
+        center_y: Y-coordinate of the ripple's center.
+        duration_ms: Total duration of the effect in milliseconds.
+    """
+    width, height = oled.width, oled.height
+    max_radius = int(math.sqrt(width ** 2 + height ** 2))  # Maximum ripple distance
+    total_frames = max_radius  # One frame per radius step
+    frame_delay = duration_ms // total_frames  # Delay per frame in ms
+
+    # Start the ripple
+    for radius in range(1, max_radius + 1):
+        for angle in range(0, 360, 5):  # Steps of 5 degrees for smoother circle
+            # Calculate the x, y position on the circle
+            rad = math.radians(angle)
+            x = int(center_x + radius * math.cos(rad))
+            y = int(center_y + radius * math.sin(rad))
+
+            # Draw the pixel if within bounds
+            if 0 <= x < width and 0 <= y < height:
+                oled.pixel(x, y, 1)
+
+        oled.show()  # Update the display
+        utime.sleep_ms(frame_delay)
+
+    # Clear the screen after the effect
+    oled.fill(0)
+    oled.show()
+
+def sparkle_dissolve(oled, duration_ms=1000, sparkle_count=50):
+    """
+    Creates a sparkle dissolve transition effect.
+
+    Parameters:
+        oled: The SSD1306 OLED object.
+        duration_ms: Total duration of the effect in milliseconds.
+        sparkle_count: Number of sparkles per frame.
+    """
+    # Get the dimensions of the display
+    width = oled.width
+    height = oled.height
+    total_pixels = width * height
+    total_frames = total_pixels // sparkle_count
+    # Calculate the total number of frames based on duration
+    frame_delay = duration_ms // (total_frames * 2)  # 2 phases: filling and clearing
+
+    # create list of all pixels and shuffle it
+    pixels = [(x, y) for x in range(width) for y in range(height)]
+    shuffle_list(pixels)
+
+    def apply_sparkles(state):
+        """Applies sparkle effect with the given state (1=on, 0=off)."""
+        counter = 0
+        while pixels:
+            x, y = pixels.pop()
+            oled.pixel(x, y, state)
+            counter += 1
+            if counter >= sparkle_count:
+                oled.show()
+                utime.sleep_ms(frame_delay)
+                counter = 0
+        oled.show()
+
+    apply_sparkles(1)
+    # clear the display
+    pixels = [(x, y) for x in range(width) for y in range(height)]
+    shuffle_list(pixels)
+    apply_sparkles(0)
+
+
+
+# while True:
+#     sparkle_dissolve(display, 1000, 50)
+#     expanding_polygon(display, center_x=64, center_y=16, duration_ms=500, sides=6, initial_rotation=30)
+#     expanding_polygon(display, center_x=64, center_y=16, duration_ms=500, sides=6, initial_rotation=0)
+#     expanding_polygon(display, center_x=64, center_y=16, duration_ms=500, sides=4, initial_rotation=0)
+#     expanding_polygon(display, center_x=64, center_y=16, duration_ms=500, sides=3, initial_rotation=0)
+#     expanding_polygon(display, center_x=64, center_y=16, duration_ms=500, sides=16, initial_rotation=0)
+#     random_expanding_polygons(display, duration_ms=100, num=5, state=1)
+#     random_expanding_polygons(display, duration_ms=100, num=5, state=0)
+#     random_expanding_polygons(display, duration_ms=100, num=5, state=-1)
 
 class LED_8SEG():
     def __init__(self):
@@ -100,7 +322,43 @@ class LED_8SEG():
                     for i in range(4):
                         self.write_cmd(self.positions[i], self.get_code_from_char(' '))
             self.displaying = False
+class OLED_SSD1306():
+    def __init__(self):
+        self.displaying = False
+        self.queue = deque((), 10)  # Queue with a maximum size of 10
+        self.display_pwr = Pin(20, Pin.OUT)
+        self.display_pwr(0)
+        self.display_pwr(1)
 
+        self.i2c = I2C(1, sda=Pin(18), scl=Pin(19), freq=400000)
+        self.oled = SSD1306_I2C(128, 32, self.i2c)
+        self.oled.poweron()  # power on the display, pixels redrawn
+
+    def display_centered_text(self, text, y_level):
+        """
+        Displays text centered horizontally and at a variable Y-level.
+
+        Parameters:
+            oled: The SSD1306 OLED object.
+            text: The text string to display.
+            y_level: The Y-coordinate where the text should be positioned.
+            font: The font to be used for rendering the text (should be a tuple containing character bitmaps).
+            max_width: The maximum width of the display (default is 128 for 128x64 displays).
+        """
+        # Calculate total width of the text
+        text_width = len(text) * 8  # Each character is 8 pixels wide
+
+        # Calculate starting X position to center the text
+        x_level = (self.oled.width - text_width) // 2
+
+        # Fill the text rect with 0
+        self.oled.fill_rect(x_level, y_level, self.oled.width, 8, 0)
+
+
+        self.oled.text(text, x_level, y_level, 1)
+
+        # Show the text on the OLED
+        self.oled.show()
 
 
 class JSON:
@@ -224,7 +482,9 @@ class RPicoStand:
             'ssid': None,
             'password': None
         }
-        self.display = LED_8SEG()
+
+        self.display = OLED_SSD1306()
+        # self.display = LED_8SEG()
 
     @staticmethod
     def serializable_fields():
@@ -248,10 +508,12 @@ class RPicoStand:
             log_data(f"Failed to load configuration from {filename}")
 
     def display_text(self, text, duration):
-        uasyncio.create_task(self.display.display_text(text, duration))
+        pass
+        # uasyncio.create_task(self.display.display_text(text, duration))
 
     def display_rolling_text(self, text, duration_per_char, repeat=1, padding=True):
-        uasyncio.create_task(self.display.display_rolling_text(text, duration_per_char,repeat, padding))
+        # uasyncio.create_task(self.display.display_rolling_text(text, duration_per_char,repeat, padding))
+        pass
 
 
 utime.sleep(3)
@@ -557,8 +819,11 @@ def try_connect_to_wifi(ssid, password):
     ip = connect_to_wifi(ssid, password, 10)
     if ip:
         log_data(f"Connected to Wi-Fi. IP address: {ip}")
-        rpicostand.display_rolling_text("connected", .3)
-        rpicostand.display_rolling_text(f"{ip}", .5, 5)
+        rpicostand.display.display_centered_text("connected.", 8)
+        rpicostand.display.display_centered_text(f"{ip}", 0)
+
+        # rpicostand.display_rolling_text("connected", .3)
+        # rpicostand.display_rolling_text(f"{ip}", .5, 5)
         set_led(True)
         utime.sleep_ms(1000)
         return True
@@ -584,6 +849,9 @@ log_data("Starting up...")
 #blinking thread
 blink_led(5, 100)
 
+expanding_polygon(rpicostand.display.oled, center_x=64, center_y=16, duration_ms=500, sides=4, initial_rotation=0)
+
+
 scan_networks()
 
 if rpicostand.wifi['ssid'] and rpicostand.wifi['password']:
@@ -593,15 +861,23 @@ if rpicostand.wifi['ssid'] and rpicostand.wifi['password']:
     if not success:
         blink_led(20, 50)
         log_data("Failed to connect to Wi-Fi. Starting pairing mode...")
-        rpicostand.display_rolling_text("internet error", .3, 1)
-        rpicostand.display_rolling_text("ap start", .3, 2)
+        rpicostand.display.fill(0)
+        rpicostand.display.oled.text("Failed to connect to Wi-Fi.", 0, 0, 1)
+        rpicostand.display.oled.text("Starting pairing mode...", 0, 16, 1)
+        rpicostand.display.oled.show()
+        # rpicostand.display_rolling_text("internet error", .3, 1)
+        # rpicostand.display_rolling_text("ap start", .3, 2)
         start_pairing_mode()
     else:
         blink_led(3, 500)
         start_work_mode()
 else:
     log_data("No Wi-Fi credentials found. Starting pairing mode...")
-    rpicostand.display_rolling_text("internet error", .3, 1)
-    rpicostand.display_rolling_text("ap start", .3, 2)
+    rpicostand.display.fill(0)
+    rpicostand.display.oled.text("No Wi-Fi credentials found.", 0, 0, 1)
+    rpicostand.display.oled.text("AP Start.", 0, 16, 1)
+    rpicostand.display.oled.show()
+    # rpicostand.display_rolling_text("internet error", .3, 1)
+    # rpicostand.display_rolling_text("ap start", .3, 2)
     blink_led(20, 50)
     start_pairing_mode()
