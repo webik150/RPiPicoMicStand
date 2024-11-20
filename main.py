@@ -18,6 +18,57 @@ from phew.template import render_template
 from phew.server import redirect, Response
 
 
+def bmp_to_ascii(file_path):
+    """
+    Converts a monochrome BMP file into a 2D list of dots and spaces for debugging.
+
+    Parameters:
+        file_path: Path to the BMP file.
+
+    Returns:
+        A list of strings, where each string represents a row of the image.
+        "." for on pixels, " " for off pixels.
+    """
+    with open(file_path, "rb") as f:
+        # Parse BMP header
+        f.seek(10)
+        offset = int.from_bytes(f.read(4), 'little')  # Start of pixel array
+        f.seek(18)
+        width = int.from_bytes(f.read(4), 'little')
+        height = int.from_bytes(f.read(4), 'little')
+        print(f"Width: {width}, Height: {height}, Offset: {offset}")
+        # Ensure the width is a multiple of 8
+        if width % 8 != 0:
+            raise ValueError("Width must be a multiple of 8 for monochrome BMP")
+        row_size = ((width + 31) // 32) * 4  # Each row is padded to the nearest 4 bytes
+        # Read raw pixel data
+        f.seek(offset)
+        raw_data  = f.read(row_size * abs(height))  # Read the raw bitmap data
+
+        # Convert raw pixel data into a 2D list of dots and spaces
+        rows = []
+        for row in range(height):
+            row_index = height - row - 1  # BMP stores rows bottom-to-top
+            row_start = row_index * row_size
+            row_pixels = []
+            for col in range(width):
+                byte_index = row_start + (col // 8)
+                bit_index = 7 - (col % 8)
+                if raw_data[byte_index] & (1 << bit_index):
+                    row_pixels.append(".")
+                else:
+                    row_pixels.append(" ")
+            rows.append("".join(row_pixels))
+
+        return rows
+
+
+# Example usage
+# ascii_art = bmp_to_ascii("board.bmp")
+# for line in ascii_art:
+#     print(line)
+
+
 def shuffle_list(lst):
     """
     Shuffle a list in place using urandom.
@@ -95,11 +146,6 @@ def random_expanding_polygons(oled, duration_ms=1000, num=5, state=1):
         oled.show()
         if (frames_per_ms > 1 and frame_counter % frames_per_ms == 0) or frames_per_ms <= 1:
             utime.sleep_ms(frame_delay)
-
-    # Clear the screen after the effect
-    #oled.fill(0)
-    #oled.show()
-
 
 def expanding_polygon(oled, center_x, center_y, duration_ms=1000, sides=6, initial_rotation=0):
     """
@@ -223,20 +269,35 @@ def sparkle_dissolve(oled, duration_ms=1000, sparkle_count=50):
     shuffle_list(pixels)
     apply_sparkles(0)
 
+class Log:
+    def __init__(self):
+        pass
 
+    @staticmethod
+    def log_data(data):
+        with open("micstandlog.txt", "a") as file:
+            file.write(f"[{utime.time()}] {str(data)}\n")
+            print(data)
 
-# while True:
-#     sparkle_dissolve(display, 1000, 50)
-#     expanding_polygon(display, center_x=64, center_y=16, duration_ms=500, sides=6, initial_rotation=30)
-#     expanding_polygon(display, center_x=64, center_y=16, duration_ms=500, sides=6, initial_rotation=0)
-#     expanding_polygon(display, center_x=64, center_y=16, duration_ms=500, sides=4, initial_rotation=0)
-#     expanding_polygon(display, center_x=64, center_y=16, duration_ms=500, sides=3, initial_rotation=0)
-#     expanding_polygon(display, center_x=64, center_y=16, duration_ms=500, sides=16, initial_rotation=0)
-#     random_expanding_polygons(display, duration_ms=100, num=5, state=1)
-#     random_expanding_polygons(display, duration_ms=100, num=5, state=0)
-#     random_expanding_polygons(display, duration_ms=100, num=5, state=-1)
+    @staticmethod
+    def delete_log_on_startup():
+        try:
+            os.remove("micstandlog.txt")
+            print("Log file deleted.")
+        except OSError:
+            print("No log file to delete.")
 
-class LED_8SEG():
+    # Function to read the log file
+    @staticmethod
+    def read_log():
+        try:
+            with open("micstandlog.txt", "r") as file:
+                data = file.read()
+            return data
+        except OSError:
+            return "Log file not found."
+
+class LED_8SEG:
     def __init__(self):
         self.displaying = False
         self.rclk = Pin(20, Pin.OUT)
@@ -322,7 +383,13 @@ class LED_8SEG():
                     for i in range(4):
                         self.write_cmd(self.positions[i], self.get_code_from_char(' '))
             self.displaying = False
-class OLED_SSD1306():
+
+class Icon:
+    def __init__(self, data):
+        self.data = data
+
+
+class OLED_SSD1306:
     def __init__(self):
         self.displaying = False
         self.queue = deque((), 10)  # Queue with a maximum size of 10
@@ -333,6 +400,119 @@ class OLED_SSD1306():
         self.i2c = I2C(1, sda=Pin(18), scl=Pin(19), freq=400000)
         self.oled = SSD1306_I2C(128, 32, self.i2c)
         self.oled.poweron()  # power on the display, pixels redrawn
+        self.icons = {}
+        self.oled.contrast(0)
+
+    def get_image_data(self, key):
+        """
+        Get image data from a 1-bit BMP image.
+
+        Parameters:
+            key: valid keys are [boot, info, error].
+
+        Returns:
+            A bytearray containing the image data loaded from a bmp file with filename key_width_height.bmp.
+        """
+        width = self.oled.width
+        height = self.oled.height
+        Log.log_data(f"Loading image {key}_{width}_{height}.bmp")
+        with open(f"{key}_{width}_{height}.bmp", "rb") as f:
+            # Parse BMP header
+            f.seek(10)
+            offset = int.from_bytes(f.read(4), 'little')  # Start of pixel array
+            f.seek(18)
+            width = int.from_bytes(f.read(4), 'little')
+            height = int.from_bytes(f.read(4), 'little')
+            print(f"Width: {width}, Height: {height}, Offset: {offset}")
+            # Ensure the width is a multiple of 8
+            if width % 8 != 0:
+                raise ValueError("Width must be a multiple of 8 for monochrome BMP")
+            row_size = ((width + 31) // 32) * 4  # Each row is padded to the nearest 4 bytes
+            # Read raw pixel data
+            f.seek(offset)
+            raw_data = f.read(row_size * abs(height))  # Read the raw bitmap data
+            # convert to bytearray
+            # raw_data = bytearray(raw_data)
+            # Log.log_data(raw_data)
+            return raw_data
+
+    def load_icons(self, keys : list[string]):
+        """
+        Get icon data from a 1-bit BMP image.
+
+        Parameters:
+            key: valid keys are [wifi, hotspot, info, error].
+
+        Returns:
+            A bytearray containing the image data loaded from a bmp file with filename key_16_16.bmp.
+        """
+
+        icon_width = 8
+        icon_height = 8
+        spritesheet_width = 64
+        spritesheet_height = 64
+
+        with open(f"icons.bmp", "rb") as f:
+            f.seek(10)
+            offset = int.from_bytes(f.read(4), 'little')
+            f.seek(18)
+            width = int.from_bytes(f.read(4), 'little')
+            height = int.from_bytes(f.read(4), 'little')
+
+            f.seek(offset)
+            data = bytearray(f.read(width * height // 8))
+
+            # split byte array into 8x8 icons
+            for i in range(0, len(data), icon_width):
+                if i > len(keys):
+                    break
+                icon_data = data[i:i + icon_height]
+                self.icons[keys[i]] = Icon(icon_data)
+
+    def blit_bitmap(self, data, width, height, x, y, color=1):
+        """
+        Blit a 1-bit BMP image to the display.
+
+        Parameters:
+            data: A bytearray containing the image data.
+            width: The width of the image.
+            height: The height of the image.
+            x: The X-coordinate where the image should be positioned.
+            y: The Y-coordinate where the image should be positioned.
+            color: The color to use for the image (default is 1).
+        """
+
+        # Create a frame buffer from the image data
+        # convert image data into MONO_VLSB
+
+        #fbuf = framebuf.FrameBuffer(bytearray(width * height), width, height, framebuf.MONO_VLSB)
+        row_size = ((width + 31) // 32) * 4
+        for row in range(height):
+            row_index = height - row - 1  # BMP stores rows bottom-to-top
+            row_start = row_index * row_size
+            for col in range(width):
+                byte_index = row_start + (col // 8)
+                bit_index = 7 - (col % 8)
+                if color==1:
+                    if data[byte_index] & (1 << bit_index):
+                        self.oled.pixel(col, row, 1)
+                else:
+                    if data[byte_index] & (1 << bit_index):
+                        pass
+                    else:
+                        self.oled.pixel(col, row, 1)
+
+
+    def display_image(self, key, color=1):
+        """
+        Display an image on the OLED.
+
+        Parameters:
+            key: valid keys are [boot, info, error].
+        """
+        data = self.get_image_data(key)
+        self.blit_bitmap(data, self.oled.width, self.oled.height, 0, 0, color)
+        self.oled.show()
 
     def display_centered_text(self, text, y_level):
         """
@@ -359,7 +539,6 @@ class OLED_SSD1306():
 
         # Show the text on the OLED
         self.oled.show()
-
 
 class JSON:
     @staticmethod
@@ -413,14 +592,6 @@ class JSON:
         else:
             raise TypeError(f"Type {type(obj)} not serializable")
 
-
-# Function to log data to the file
-def log_data(data):
-    with open("micstandlog.txt", "a") as file:
-        file.write(f"[{utime.time()}] {str(data)}\n")
-        print(data)
-
-
 class Motor:
     def __init__(self, dir_pin, step_pin, enable_pin, substeps=4, speeds=None):
         if speeds is None:
@@ -445,7 +616,7 @@ class Motor:
             return
         # Set up timer for stepping
         step_duration = self.speeds[max(min(speed, len(self.speeds)) - 1, 0)]
-        log_data(f"Rotating motor with {step_duration} step duration")
+        Log.log_data(f"Rotating motor with {step_duration} step duration")
         self.enable_pin.value(0)
         self.moving = True
         self.timer.init(freq=1000000 // step_duration, mode=Timer.PERIODIC, callback=self.internal_step)
@@ -470,7 +641,6 @@ class Motor:
         data = ujson.loads(json_str)
         JSON.deserialize(self, data)
 
-
 class RPicoStand:
     def __init__(self):
         self.motors = {
@@ -482,6 +652,9 @@ class RPicoStand:
             'ssid': None,
             'password': None
         }
+
+        self.set_led(False)
+        self.networks = []
 
         self.display = OLED_SSD1306()
         # self.display = LED_8SEG()
@@ -505,7 +678,47 @@ class RPicoStand:
                 data = f.read()
                 self.from_json(data)
         except OSError:
-            log_data(f"Failed to load configuration from {filename}")
+            Log.log_data(f"Failed to load configuration from {filename}")
+
+    # set LED pin function
+    async def set_led_internal(self, state: bool):
+        await uasyncio.sleep_ms(10)
+        Pin("LED", Pin.OUT)(state)
+
+    # set LED pin function
+    def set_led(self, state: bool):
+        uasyncio.create_task(self.set_led_internal(state))
+
+    # function to set the Next Blink
+    def blink_led(self, times, interval):
+        uasyncio.create_task(self.blink_led_internal(times, interval))
+
+    # function to blink the LED n number of times with m ms delay
+    async def blink_led_internal(self, times, interval_ms):
+        await self.set_led_internal(False)
+        for i in range(times):
+            await self.set_led_internal(True)
+            await uasyncio.sleep_ms(interval_ms)
+            await self.set_led_internal(False)
+            await uasyncio.sleep_ms(interval_ms)
+
+    def save_configuration(self):
+        with open("config.json", "w") as f:
+            js = self.to_json()
+            Log.log_data(f"Saving configuration")
+            f.write(js)
+            f.flush()
+            f.close()
+            self.display_rolling_text("config saved", .3, 1)
+
+    # Save Wi-Fi credentials to a file
+    def save_wifi_credentials(self, ssid, password):
+        self.wifi = {"ssid": ssid, "password": password}
+        self.save_configuration()
+
+    def save_hostname(self, hostname):
+        self.hostname = hostname
+        self.save_configuration()
 
     def display_text(self, text, duration):
         pass
@@ -515,33 +728,33 @@ class RPicoStand:
         # uasyncio.create_task(self.display.display_rolling_text(text, duration_per_char,repeat, padding))
         pass
 
+    def show_boot_logo(self):
+        self.display.oled.fill(0)
+        self.display.display_image("boot", 1)
+        utime.sleep_ms(2000)
 
-utime.sleep(3)
+
+
+utime.sleep(1)
 rpicostand = RPicoStand()
-log_data(rpicostand.to_json())
-log_data(rpicostand.motors['x'])
 # load configuration from file
 rpicostand.load_from_file("config.json")
 
-log_data(rpicostand.to_json())
-log_data(rpicostand.motors['x'])
+# while True:
+#     sparkle_dissolve(rpicostand.display.oled, 1000, 50)
+#     expanding_polygon(rpicostand.display.oled, center_x=64, center_y=16, duration_ms=500, sides=6, initial_rotation=30)
+#     expanding_polygon(rpicostand.display.oled, center_x=64, center_y=16, duration_ms=500, sides=6, initial_rotation=0)
+#     expanding_polygon(rpicostand.display.oled, center_x=64, center_y=16, duration_ms=500, sides=4, initial_rotation=0)
+#     expanding_polygon(rpicostand.display.oled, center_x=64, center_y=16, duration_ms=500, sides=3, initial_rotation=0)
+#     expanding_polygon(rpicostand.display.oled, center_x=64, center_y=16, duration_ms=500, sides=16, initial_rotation=0)
+#     random_expanding_polygons(rpicostand.display.oled, duration_ms=100, num=5, state=1)
+#     random_expanding_polygons(rpicostand.display.oled, duration_ms=100, num=5, state=0)
+#     random_expanding_polygons(rpicostand.display.oled, duration_ms=100, num=5, state=-1)
+
+rpicostand.show_boot_logo()
 
 # set machine hostname to DOMAIN
 network.hostname(rpicostand.hostname)
-#uasyncio.create_task(rpicostand.display.display_text("ON", 2))
-#uasyncio.create_task(rpicostand.display.display_text(" ", 2))
-#uasyncio.create_task(rpicostand.display.display_text("Fart", 4))
-#rpicostand.display.debug_infinite_loop()
-rpicostand.display_rolling_text("stand init", .5, 1)
-#DOMAIN = f"{network.hostname()}.local" # This is the address that is shown on the Captive Portal
-
-def delete_log_on_startup():
-    try:
-        os.remove("micstandlog.txt")
-        print("Log file deleted.")
-    except OSError:
-        print("No log file to delete.")
-
 
 @server.route("/", methods=['GET', 'POST'])
 def index(request):
@@ -570,13 +783,13 @@ def configure(request):
         new_z_speed = request.form.get("z_speed", None)
 
         if ssid and password:
-            log_data("Saving credentials!")
+            Log.log_data("Saving credentials!")
             save_wifi_credentials(ssid, password)
             reboot_required = True
             config_changed = True
 
         if new_hostname and new_hostname != network.hostname():
-            log_data(f"Changing hostname to {new_hostname}")
+            Log.log_data(f"Changing hostname to {new_hostname}")
             network.hostname(new_hostname)
             reboot_required = True
             config_changed = True
@@ -587,11 +800,11 @@ def configure(request):
             new_x_speed = ''.join([x for x in new_x_speed if x.isdigit() or x == ','])
             new_x_speed = [int(x) for x in new_x_speed.split(",")]
             if new_x_speed != rpicostand.motors['x'].speeds and len(new_x_speed) == 3:
-                log_data(f"Changing x speeds to {new_x_speed}")
+                Log.log_data(f"Changing x speeds to {new_x_speed}")
                 rpicostand.motors['x'].speeds = new_x_speed
                 config_changed = True
             else:
-                log_data(f"Invalid x speeds: {new_x_speed}")
+                Log.log_data(f"Invalid x speeds: {new_x_speed}")
 
         if new_y_speed:
             # parse to list of ints
@@ -599,11 +812,11 @@ def configure(request):
             new_y_speed = ''.join([x for x in new_y_speed if x.isdigit() or x == ','])
             new_y_speed = [int(x) for x in new_y_speed.split(",")]
             if new_y_speed != rpicostand.motors['y'].speeds and len(new_y_speed) == 3:
-                log_data(f"Changing y speeds to {new_y_speed}")
+                Log.log_data(f"Changing y speeds to {new_y_speed}")
                 rpicostand.motors['y'].speeds = new_y_speed
                 config_changed = True
             else:
-                log_data(f"Invalid y speeds: {new_y_speed}")
+                Log.log_data(f"Invalid y speeds: {new_y_speed}")
 
         if new_z_speed:
             # parse to list of ints
@@ -611,11 +824,11 @@ def configure(request):
             new_z_speed = ''.join([x for x in new_z_speed if x.isdigit() or x == ','])
             new_z_speed = [int(x) for x in new_z_speed.split(",")]
             if new_z_speed != rpicostand.motors['z'].speeds and len(new_z_speed) == 3:
-                log_data(f"Changing z speeds to {new_z_speed}")
+                Log.log_data(f"Changing z speeds to {new_z_speed}")
                 rpicostand.motors['z'].speeds = new_z_speed
                 config_changed = True
             else:
-                log_data(f"Invalid z speeds: {new_z_speed}")
+                Log.log_data(f"Invalid z speeds: {new_z_speed}")
 
         if config_changed:
             save_configuration()
@@ -651,13 +864,13 @@ def move_motor(request):
     speed = request.data.get("speed", None)
 
     if rpicostand.motors.get(motor) is None:
-        log_data(f"Invalid motor: {motor}")
+        Log.log_data(f"Invalid motor: {motor}")
         return Response("Invalid motor", status=400, headers={"Content-Type": "text/html"})
     if speed <= 0:
         rpicostand.motors[motor].stop()
         return Response(f"Motor {motor} stopped", status=200, headers={"Content-Type": "text/html"})
     if direction not in ['cw', 'ccw']:
-        log_data(f"Invalid direction: {direction}")
+        Log.log_data(f"Invalid direction: {direction}")
         return Response("Invalid direction", status=400, headers={"Content-Type": "text/html"})
 
     rpicostand.motors[motor].set_direction(direction)
@@ -680,7 +893,7 @@ def fetch_log(request):
     for motor in rpicostand.motors:
         if rpicostand.motors[motor].moving:
             return Response("Motors are moving", status=503, headers={"Content-Type": "text/html"})
-    return Response(read_log(), status=200, headers={"Content-Type": "text/html"})
+    return Response(Log.read_log(), status=200, headers={"Content-Type": "text/html"})
 
 
 #@server.catchall()
@@ -690,81 +903,16 @@ def catch_all(request):
         return redirect("http://" + DOMAIN)
 
 
-# set LED pin function
-async def set_led_internal(state: bool):
-    await uasyncio.sleep_ms(10)
-    Pin("LED", Pin.OUT)(state)
-
-
-# set LED pin function
-def set_led(state: bool):
-    uasyncio.create_task(set_led_internal(state))
-
-
 async def restart_after_while():
     await uasyncio.sleep_ms(5000)
     sys.exit()
 
-
-set_led(False)
-nextBlink = None
-networks = []
-
-
-# function to set the Next Blink
-def blink_led(times, interval):
-    uasyncio.create_task(blink_led_internal(times, interval))
-    global nextBlink
-    nextBlink = {"times": times, "interval": interval}
-
-
-# function to set the Next Blink
-def keep_blinking(times, interval, pause_interval):
-    global nextBlink
-    nextBlink = {"times": times, "interval": interval, "pause_interval": pause_interval}
-
-
-# function to blink the LED n number of times with m ms delay
-async def blink_led_internal(times, interval_ms):
-    await set_led_internal(False)
-    for i in range(times):
-        await set_led_internal(True)
-        await uasyncio.sleep_ms(interval_ms)
-        await set_led_internal(False)
-        await uasyncio.sleep_ms(interval_ms)
-
-
-def save_configuration():
-    global rpicostand
-    with open("config.json", "w") as f:
-        js = rpicostand.to_json()
-        log_data(f"Saving configuration: {js}")
-        f.write(js)
-        f.flush()
-        f.close()
-        rpicostand.display_rolling_text("config saved", .3, 1)
-
-# Save Wi-Fi credentials to a file
-def save_wifi_credentials(ssid, password):
-    global rpicostand
-    rpicostand.wifi = {"ssid": ssid, "password": password}
-    save_configuration()
-
-
-def save_hostname(hostname):
-    global rpicostand
-    rpicostand.hostname = hostname
-    save_configuration()
-
-
 def index_page():
-    global networks
-    global rpicostand
     # turn speeds into comma separated strings
     return render_template("index.html",
                            hostname=network.hostname(),
-                           networks_list=networks,
-                           device_log=read_log(),
+                           networks_list=rpicostand.networks,
+                           device_log=Log.read_log(),
                            current_mode="Work Mode" if rpicostand.wifi['ssid'] and rpicostand.wifi['password'] else "Pairing Mode",
                            x_speed=','.join([str(x) for x in rpicostand.motors['x'].speeds]),
                             y_speed=','.join([str(x) for x in rpicostand.motors['y'].speeds]),
@@ -773,94 +921,81 @@ def index_page():
 
 
 def start_work_mode():
-    log_data("Starting work mode...")
+    Log.log_data("Starting work mode...")
     # should already be connected to wifi, so just start the server
     server.run(host="0.0.0.0", port=80)  # Run the server
-    log_data("Work mode started.")
+    Log.log_data("Work mode started.")
 
 
 def start_pairing_mode():
-    log_data("Starting Captive Portal...")
+    Log.log_data("Starting Captive Portal...")
     # Set to Accesspoint mode
     ap = access_point("RPiPicoMicStand", "PicoStand123")  # NAME YOUR SSID
     ip = ap.ifconfig()[0]  # Grab the IP address and store it
-    log_data(f"starting DNS server on {ip}")
+    Log.log_data(f"starting DNS server on {ip}")
     dns.run_catchall(ip)  # Catch all requests and reroute them
-    global DOMAIN
-    #DOMAIN = ip
-    blink_led(100, 2000)
+    rpicostand.blink_led(100, 2000)
     server.run(host="0.0.0.0", port=80)  # Run the server
     # logging.info("Webserver Started")
-    log_data("Captive Portal started.")
+    Log.log_data("Captive Portal started.")
 
 
 def scan_networks():
     # Enumerate available networks
-    global networks
     wlan = network.WLAN(network.STA_IF)
     wlan.active(True)
-    blink_led(1, 200)
-    networks = wlan.scan()
-    log_data("Scanning for networks...")
-    log_data(networks)
+    rpicostand.blink_led(1, 200)
+    rpicostand.networks = wlan.scan()
+    Log.log_data("Scanning for networks...")
+    Log.log_data(rpicostand.networks)
     # join networks object to string
-    blink_led(1, 200)
+    rpicostand.blink_led(1, 200)
     wlan.active(False)
-    return networks
+    return rpicostand.networks
 
 
 def try_connect_to_wifi(ssid, password):
     if not ssid or not password:
-        log_data("No Wi-Fi credentials found.")
+        Log.log_data("No Wi-Fi credentials found.")
         return False
 
-    blink_led(50, 200)
+    rpicostand.blink_led(50, 200)
 
     ip = connect_to_wifi(ssid, password, 10)
     if ip:
-        log_data(f"Connected to Wi-Fi. IP address: {ip}")
+        Log.log_data(f"Connected to Wi-Fi. IP address: {ip}")
+        rpicostand.display.oled.fill(0)
+        rpicostand.display.display_image('info', 0)
+        utime.sleep_ms(1000)
         rpicostand.display.display_centered_text("connected.", 8)
         rpicostand.display.display_centered_text(f"{ip}", 0)
 
         # rpicostand.display_rolling_text("connected", .3)
         # rpicostand.display_rolling_text(f"{ip}", .5, 5)
-        set_led(True)
+        rpicostand.set_led(True)
         utime.sleep_ms(1000)
         return True
     else:
-        log_data("Failed to connect to Wi-Fi.")
-        blink_led(20, 50)
+        Log.log_data("Failed to connect to Wi-Fi.")
+        rpicostand.blink_led(20, 50)
         utime.sleep_ms(1000)
         return False
 
 
-# Function to read the log file
-def read_log():
-    try:
-        with open("micstandlog.txt", "r") as file:
-            data = file.read()
-        return data
-    except OSError:
-        return "Log file not found."
-
-
-delete_log_on_startup()
-log_data("Starting up...")
+Log.delete_log_on_startup()
+Log.log_data("Starting up...")
 #blinking thread
-blink_led(5, 100)
-
-expanding_polygon(rpicostand.display.oled, center_x=64, center_y=16, duration_ms=500, sides=4, initial_rotation=0)
-
+rpicostand.blink_led(5, 100)
 
 scan_networks()
 
 if rpicostand.wifi['ssid'] and rpicostand.wifi['password']:
-    log_data("Wi-Fi credentials found.")
-    blink_led(3, 500)
+    Log.log_data("Wi-Fi credentials found.")
+    rpicostand.blink_led(3, 500)
     success = try_connect_to_wifi(rpicostand.wifi['ssid'], rpicostand.wifi['password'])
     if not success:
-        blink_led(20, 50)
-        log_data("Failed to connect to Wi-Fi. Starting pairing mode...")
+        rpicostand.blink_led(20, 50)
+        Log.log_data("Failed to connect to Wi-Fi. Starting pairing mode...")
         rpicostand.display.fill(0)
         rpicostand.display.oled.text("Failed to connect to Wi-Fi.", 0, 0, 1)
         rpicostand.display.oled.text("Starting pairing mode...", 0, 16, 1)
@@ -869,15 +1004,15 @@ if rpicostand.wifi['ssid'] and rpicostand.wifi['password']:
         # rpicostand.display_rolling_text("ap start", .3, 2)
         start_pairing_mode()
     else:
-        blink_led(3, 500)
+        rpicostand.blink_led(3, 500)
         start_work_mode()
 else:
-    log_data("No Wi-Fi credentials found. Starting pairing mode...")
+    Log.log_data("No Wi-Fi credentials found. Starting pairing mode...")
     rpicostand.display.fill(0)
     rpicostand.display.oled.text("No Wi-Fi credentials found.", 0, 0, 1)
     rpicostand.display.oled.text("AP Start.", 0, 16, 1)
     rpicostand.display.oled.show()
     # rpicostand.display_rolling_text("internet error", .3, 1)
     # rpicostand.display_rolling_text("ap start", .3, 2)
-    blink_led(20, 50)
+    rpicostand.blink_led(20, 50)
     start_pairing_mode()
