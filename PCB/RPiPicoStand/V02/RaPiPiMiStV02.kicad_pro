@@ -471,7 +471,10 @@
     "meta": {
       "version": 3
     },
-    "net_colors": null,
+    "net_colors": {
+      "Net-(5VBUCK2-IN+)": "rgb(255, 0, 15)",
+      "Net-(5VBUCK2-OUT+)": "rgb(149, 0, 6)"
+    },
     "netclass_assignments": null,
     "netclass_patterns": []
   },
