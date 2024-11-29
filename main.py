@@ -398,10 +398,17 @@ class OLED_SSD1306:
         self.display_pwr(1)
 
         self.i2c = I2C(1, sda=Pin(18), scl=Pin(19), freq=400000)
-        self.oled = SSD1306_I2C(128, 32, self.i2c)
+        self.oled = SSD1306_I2C(128, 64, self.i2c)
         self.oled.poweron()  # power on the display, pixels redrawn
         self.icons = {}
-        self.oled.contrast(0)
+        self.oled.contrast(10)
+
+    def test_brightness(self):
+        for i in range(256):
+            self.oled.contrast(i)
+            self.display_centered_text(f"{i}", 32)
+            utime.sleep_ms(10)
+            self.oled.show()
 
     def get_image_data(self, key):
         """
@@ -731,6 +738,7 @@ class RPicoStand:
     def show_boot_logo(self):
         self.display.oled.fill(0)
         self.display.display_image("boot", 1)
+        #self.display.test_brightness()
         utime.sleep_ms(2000)
 
 
