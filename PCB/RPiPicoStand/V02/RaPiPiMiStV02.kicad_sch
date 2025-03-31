@@ -5292,7 +5292,7 @@
 				)
 			)
 		)
-		(property "Footprint" "Motors:MODULE_TMC2209_SILENTSTEPSTICK"
+		(property "Footprint" "RaPiPiMiSt:MODULE_TMC2209_SILENTSTEPSTICK"
 			(at 67.31 86.36 0)
 			(effects
 				(font
@@ -5529,7 +5529,7 @@
 				)
 			)
 		)
-		(property "Footprint" "Motors:MODULE_TMC2209_SILENTSTEPSTICK"
+		(property "Footprint" "RaPiPiMiSt:MODULE_TMC2209_SILENTSTEPSTICK"
 			(at 193.04 134.62 0)
 			(effects
 				(font
@@ -6118,7 +6118,7 @@
 				(justify right)
 			)
 		)
-		(property "Footprint" "Library:BUCK Converter 5-30V 5V 3A smd"
+		(property "Footprint" "RaPiPiMiSt:BUCK Converter 5-30V 5V 3A smd"
 			(at 250.19 76.2 0)
 			(effects
 				(font
@@ -6663,7 +6663,7 @@
 				)
 			)
 		)
-		(property "Footprint" "Motors:MODULE_TMC2209_SILENTSTEPSTICK"
+		(property "Footprint" "RaPiPiMiSt:MODULE_TMC2209_SILENTSTEPSTICK"
 			(at 53.34 168.91 0)
 			(effects
 				(font
