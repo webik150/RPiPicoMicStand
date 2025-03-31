@@ -91,6 +91,13 @@
             };
             xhr.send(formData); // Send the form data
         }
+
+        function restart() {
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', '/restart', true);
+            xhr.setRequestHeader('Content-Type', 'application/json');
+            xhr.send(JSON.stringify({}));
+        }
     </script>
     <style>
         #log {
@@ -239,8 +246,11 @@
                                class="mt-1 block w-full p-2 border text-white bg-slate-900 border-slate-950 rounded"
                                value="{{z_speed}}">
                         <br>
+                        <div class="flex content-between">
+                            <input type="submit" value="Apply" class="cursor-pointer bg-indigo-500 text-white p-3 rounded">
+                            <button value="Apply" class="cursor-pointer bg-indigo-500 text-white p-3 rounded ms-auto" onclick="restart()">Restart</button>
+                        </div>
 
-                        <input type="submit" value="Apply" class="cursor-pointer bg-indigo-500 text-white p-3 rounded">
                     </form>
                 </div>
             </div>

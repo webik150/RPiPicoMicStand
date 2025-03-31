@@ -6,7 +6,6 @@ __pycache__/
 
 # MicroPython specific
 boot.py
-main.py
 *.bin
 *.elf
 *.hex
