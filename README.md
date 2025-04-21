@@ -26,9 +26,9 @@ The software part operates in two modes:
 
 - **Hardware**:
   - PCB V2
-    - 1x Raspberry Pi Pico W
-    - 3x TMC2209
-    - 1x 12-24V 3A power supply
+    - 1x Raspberry Pi Pico W (Pico W 1 is recommended for now as Pico W 2 micropython is in pre-release)
+    - 3x TMC2209. I'm using black+green V2, others *should* work, but sometimes the pin layout differs.
+    - 1x 12V 3A power supply
     - 5V Buck converter (most I've seen support different input voltages 5-30V). Should support 3A.
     - (optionally) SSD1306 OLED display. 128x64 works out of the box, 128x32 needs additional tweaks.
   - Stand itself
