@@ -34,21 +34,25 @@ class Motor:
         Log.log_data(f"Initializing motor {self.mtr_id}, with pins {self.dir_pin}, {self.step_pin}, {self.enable_pin}, {self.diag_pin}, {self.tx_pin}, {self.rx_pin}, on uart {self.uart_id}")
         self.tmc = TMC_2209(pin_step=self.step_pin, pin_dir=self.dir_pin, pin_en=self.enable_pin, tx_pin=Pin(self.tx_pin),
                             rx_pin=Pin(self.rx_pin), mtr_id=self.mtr_id, serialport=self.uart_id)
-        self.tmc.setMotorEnabled(False)
-        self.tmc.setDirection_reg(False)
-        self.tmc.setVSense(True)
-        self.tmc.setCurrent(700)
-        self.tmc.setIScaleAnalog(False)
-        self.tmc.setInterpolation(True)
-        self.tmc.setSpreadCycle(False)
-        self.tmc.setMicrosteppingResolution(64)
-        self.tmc.setInternalRSense(False)
 
-        self.tmc.readIOIN()
-        self.tmc.readCHOPCONF()
-        self.tmc.readDRVSTATUS()
-        self.tmc.readGCONF()
-        self.tmc.tmc_uart.flushSerialBuffer()
+        if self.tmc.active:
+            self.tmc.setMotorEnabled(False)
+            self.tmc.setDirection_reg(False)
+            self.tmc.setVSense(True)
+            self.tmc.setCurrent(700)
+            self.tmc.setIScaleAnalog(False)
+            self.tmc.setInterpolation(True)
+            self.tmc.setSpreadCycle(False)
+            self.tmc.setMicrosteppingResolution(64)
+            self.tmc.setInternalRSense(False)
+
+            self.tmc.readIOIN()
+            self.tmc.readCHOPCONF()
+            self.tmc.readDRVSTATUS()
+            self.tmc.readGCONF()
+            self.tmc.tmc_uart.flushSerialBuffer()
+        else:
+            Log.log_data(f"Failed to initialize motor {self.mtr_id}, continuing without it")
 
     def set_direction(self, direction):
         self.dir_pin.value(1 if direction == 'cw' else 0)
@@ -89,9 +93,9 @@ class RPicoStand:
         self.motors = {
             'x': Motor(dir_pin=5, step_pin=4, enable_pin=2, diag_pin=3, tx_pin=0, rx_pin=1, mtr_id=1),
             #'y': Motor(dir_pin=Pin(6, Pin.OUT), step_pin=Pin(7, Pin.OUT), enable_pin=Pin(8, Pin.OUT, value=1), diag_pin=Pin(4, Pin.IN), tx_pin=Pin(1, Pin.OUT), rx_pin=Pin(2, Pin.IN)),
-            'y': Motor(dir_pin=12, step_pin=11, enable_pin=10, diag_pin=7, tx_pin=8, rx_pin=9, mtr_id=0),
+            'y': Motor(dir_pin=12, step_pin=11, enable_pin=10, diag_pin=7, tx_pin=0, rx_pin=1, mtr_id=0),
             #'z': Motor(dir_pin=Pin(0, Pin.OUT), step_pin=Pin(1, Pin.OUT), enable_pin=Pin(2, Pin.OUT, value=1), diag_pin=Pin(4, Pin.IN), tx_pin=Pin(1, Pin.OUT), rx_pin=Pin(2, Pin.IN))
-            'z': Motor(dir_pin=21, step_pin=20, enable_pin=19, diag_pin=18, tx_pin=16, rx_pin=17, mtr_id=3),
+            'z': Motor(dir_pin=21, step_pin=20, enable_pin=19, diag_pin=18, tx_pin=0, rx_pin=1, mtr_id=2),
         }
         self.hostname = 'rpicostand'
         self.wifi = {
@@ -189,8 +193,11 @@ class RPicoStand:
     async def initialize(self):
         # Initialize motors
         for key, motor in self.motors.items():
-            if key in ['z']:
-                continue
             Log.log_data(f"Initializing motor {key}")
             motor.initialize()
+            if motor.tmc.active:
+                motor.tmc.testDirStepEn()
+                motor.tmc.setLoglevel(Loglevel.debug)
+                motor.tmc.doHoming(0)
             await uasyncio.sleep_ms(1000)
+        Log.log_data(f"Motors initialized. Found motors {[key for key,motor in self.motors.items() if motor.tmc.active]}")

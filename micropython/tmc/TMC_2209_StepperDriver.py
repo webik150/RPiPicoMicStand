@@ -1,4 +1,4 @@
-from micropython.modules.log import Log
+from modules.log import Log
 from .TMC2209_uart import TMC_UART
 from . import TMC2209_reg as reg
 from machine import Pin as GPIO
@@ -84,6 +84,7 @@ class TMC_2209:
         self._pin_step = pin_step
         self._pin_dir = pin_dir
         self._pin_en = pin_en
+        self.active = True
         #if (self._loglevel >= Loglevel.info):
         print("TMC2209: Init")
         self.p_pin_step = GPIO(self._pin_step, GPIO.OUT)
@@ -92,10 +93,13 @@ class TMC_2209:
         self.p_pin_dir(self._direction)
         #if (self._loglevel >= Loglevel.info):
         print("TMC2209: GPIO Init finished")
-        self.readStepsPerRevolution()
-        self.clearGSTAT()
+        if not self.clearGSTAT():
+            self.active = False
+        else:
+            self.readStepsPerRevolution()
+        if not self.clearGSTAT():
+            self.active = False
         self.tmc_uart.flushSerialBuffer()
-        #if (self._loglevel >= Loglevel.info):
         print("TMC2209: Init finished")
 
     # -----------------------------------------------------------------------
@@ -241,10 +245,11 @@ class TMC_2209:
         gstat = self.tmc_uart.read_int(reg.GSTAT)
         if gstat == -1:
             Log.log_data("TMC2209: Error reading GSTAT")
-            return
+            return False
         gstat = self.tmc_uart.set_bit(gstat, reg.reset)
         gstat = self.tmc_uart.set_bit(gstat, reg.drv_err)
         self.tmc_uart.write_reg_check(reg.GSTAT, gstat)
+        return True
 
     # -----------------------------------------------------------------------
     # read the register Adress "IOIN" and prints all current setting

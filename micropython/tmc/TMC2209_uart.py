@@ -95,19 +95,20 @@ class TMC_UART:
     # -----------------------------------------------------------------------
     def read_int(self, reg):
         tries = 0
-        while (True):
+        while True:
             rtn = self.read_reg(reg)
             tries += 1
-            if (len(rtn) >= 4):
+            if len(rtn) >= 4:
                 break
             else:
-                print("TMC2209: did not get the expected 4 data bytes. Instead got " + str(len(rtn)) + " Bytes")
-            if (tries >= 50):
+                #print("TMC2209: did not get the expected 4 data bytes. Instead, got " + str(len(rtn)) + " Bytes")
+                pass
+            if tries >= 10:
                 print("TMC2209: after 10 tries not valid answer. exiting")
                 print("TMC2209: is Stepper Powersupply switched on ?")
                 return -1
         val = struct.unpack(">i", rtn)[0]
-        return (val)
+        return val
 
     # -----------------------------------------------------------------------
     # this function can write a value to the register of the tmc

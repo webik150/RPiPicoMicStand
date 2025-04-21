@@ -3,15 +3,12 @@ import utime
 import network
 import uasyncio
 from modules.log import Log
-
+from modules.rpicostand import RPicoStand
 # server
 from phew import logging, server, access_point, dns, connect_to_wifi
 from phew.template import render_template
 from phew.server import redirect, Response
 from machine import Pin
-from tmc.TMC2209_uart import TMC_UART
-
-import tmc.TMC2209_reg as reg
 
 # while True:
 #     sparkle_dissolve(rpicostand.display.oled, 1000, 50)
@@ -25,163 +22,11 @@ import tmc.TMC2209_reg as reg
 #     random_expanding_polygons(rpicostand.display.oled, duration_ms=100, num=5, state=-1)
 from modules.displays import OLED_SSD1306
 
-
-def compute_crc8_atm(datagram, initial_value=0):
-    crc = initial_value
-    # Iterate bytes in data
-    for byte in datagram:
-        # Iterate bits in byte
-        for _ in range(0, 8):
-            if (crc >> 7) ^ (byte & 0x01):
-                crc = ((crc << 1) ^ 0x07) & 0xFF
-            else:
-                crc = (crc << 1) & 0xFF
-            # Shift to next bit
-            byte = byte >> 1
-    return crc
-
 print("Starting up")
 led = Pin("LED", Pin.OUT)
 led(1)
 utime.sleep_ms(3000)
 led(0)
-print("Starting display")
-dis = OLED_SSD1306(enable_pin=13, sda_pin=14, scl_pin=15)
-if dis.oled is None:
-    dis = OLED_SSD1306(enable_pin=13, sda_pin=14, scl_pin=15)
-dis.fill(0)
-dis.display_centered_text("Init X", 16)
-utime.sleep_ms(1000)
-print("Initing X")
-p_pin_step = Pin(4, Pin.OUT)
-p_pin_dir = Pin(5, Pin.OUT)
-p_pin_en = Pin(2, Pin.OUT)
-p_pin_diag = Pin(3, Pin.IN)
-p_pin_step(0)
-p_pin_dir(0)
-p_pin_en(1)
-baudrate = 115200
-print("Diag X: ", p_pin_diag.value())
-driver = TMC_UART(0, 112500, Pin(1, Pin.IN), Pin(0, Pin.OUT), 1)
-driver2 = TMC_UART(0, 112500, Pin(1, Pin.IN), Pin(0, Pin.OUT), 0)
-driver3 = TMC_UART(0, 112500, Pin(1, Pin.IN), Pin(0, Pin.OUT), 2)
-gstat = driver.read_int(reg.GSTAT)
-if gstat != -1:
-    gstat = driver.set_bit(gstat, reg.reset)
-    gstat = driver.set_bit(gstat, reg.drv_err)
-    driver.write_reg_check(reg.GSTAT, gstat)
-    print("Inited X")
-    dis.fill(0)
-    dis.display_centered_text("Inited X", 16)
-    print("Diag X: ", p_pin_diag.value())
-    utime.sleep_ms(1000)
-else:
-    print("Failed to init X")
-    dis.fill(0)
-    dis.display_centered_text("FAIL X", 16)
-    print("Diag X: ", p_pin_diag.value())
-    utime.sleep_ms(1000)
-
-gstat = driver2.read_int(reg.GSTAT)
-if gstat != -1:
-    gstat = driver2.set_bit(gstat, reg.reset)
-    gstat = driver2.set_bit(gstat, reg.drv_err)
-    driver2.write_reg_check(reg.GSTAT, gstat)
-    print("Inited Y")
-    dis.fill(0)
-    dis.display_centered_text("Inited Y", 16)
-    print("Diag Y: ", p_pin_diag.value())
-    utime.sleep_ms(1000)
-else:
-    print("Failed to init Y")
-    dis.fill(0)
-    dis.display_centered_text("FAIL Y", 16)
-    print("Diag Y: ", p_pin_diag.value())
-    utime.sleep_ms(1000)
-
-gstat = driver3.read_int(reg.GSTAT)
-if gstat != -1:
-    gstat = driver3.set_bit(gstat, reg.reset)
-    gstat = driver3.set_bit(gstat, reg.drv_err)
-    driver3.write_reg_check(reg.GSTAT, gstat)
-    print("Inited Z")
-    dis.fill(0)
-    dis.display_centered_text("Inited Z", 16)
-    print("Diag Z: ", p_pin_diag.value())
-    utime.sleep_ms(1000)
-else:
-    print("Failed to init Z")
-    dis.fill(0)
-    dis.display_centered_text("FAIL Z", 16)
-    print("Diag Z: ", p_pin_diag.value())
-    utime.sleep_ms(1000)
-
-# p_pin_step = Pin(11, Pin.OUT)
-# p_pin_dir = Pin(12, Pin.OUT)
-# p_pin_en = Pin(10, Pin.OUT)
-# p_pin_diag = Pin(7, Pin.IN)
-# p_pin_step(0)
-# p_pin_dir(0)
-# p_pin_en(0)
-
-
-# print("Initing Y")
-# dis.fill(0)
-# dis.display_centered_text("Init Y", 16)
-# utime.sleep_ms(1000)
-# driver1 = TMC_UART(1, 112500, Pin(9, Pin.IN), Pin(8, Pin.OUT), 0)
-# gstat = driver1.read_int(reg.GSTAT)
-# if gstat != -1:
-#     gstat = driver1.set_bit(gstat, reg.reset)
-#     gstat = driver1.set_bit(gstat, reg.drv_err)
-#     driver1.write_reg_check(reg.GSTAT, gstat)
-#     print("Inited Y")
-#     dis.fill(0)
-#     dis.display_centered_text("Inited Y", 16)
-#     utime.sleep_ms(1000)
-# else:
-#     print("Failed to init Y")
-#     dis.fill(0)
-#     dis.display_centered_text("FAIL Y", 16)
-#     utime.sleep_ms(1000)
-#     print("Diag Y: ", p_pin_diag.value())
-
-#
-#
-
-# print("Initing Z")
-# dis.fill(0)
-# dis.display_centered_text("Init Z", 16)
-# utime.sleep_ms(1000)
-#
-# p_pin_step = Pin(20, Pin.OUT)
-# p_pin_dir = Pin(21, Pin.OUT)
-# p_pin_en = Pin(19, Pin.OUT)
-# p_pin_diag = Pin(18, Pin.IN)
-# p_pin_step(0)
-# p_pin_dir(0)
-# p_pin_en(0)
-#
-# driver = TMC_UART(0, 60000, Pin(17, Pin.IN), Pin(16, Pin.OUT), 3)
-# gstat = driver.read_int(reg.GSTAT)
-# if gstat != -1:
-#     gstat = driver.set_bit(gstat, reg.reset)
-#     gstat = driver.set_bit(gstat, reg.drv_err)
-#     driver.write_reg_check(reg.GSTAT, gstat)
-#     print("Inited Z")
-#     dis.fill(0)
-#     dis.display_centered_text("Inited Z", 16)
-#     utime.sleep_ms(1000)
-# else:
-#     print("Failed to init Z")
-#     dis.fill(0)
-#     dis.display_centered_text("FAIL Z", 16)
-#     utime.sleep_ms(1000)
-#
-# # driver1.ser.deinit()
-# driver.ser.deinit()
-
-raise SystemExit
 
 @server.route("/", methods=['GET', 'POST'])
 def index(request):
