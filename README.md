@@ -10,6 +10,7 @@ The software part operates in two modes:
 
 
 ### Updates
+- **2025-04-21**: Update PCB to V2.1. It uses a much simpler and cheaper design. It's now just 2 layers instead of 4 and should be compatible with more types of TMC2209.
 - **2024-12-15**: Made a V2 of the PCB, it's much smaller, uses SMD components and TMC2209 instead of A4988. I also added a connector for an OLED display.
 - **2024-11-02**: PCB was tested out to be working so I added files for it along with pics. Feel free to have it made, I usually use JLCPCB for that. I also added an 8SEG display to the thing last minute, which means there's no connector for it on the PCB, however you can just solder 4 pins to the top of the Pico like in the pic below.
 

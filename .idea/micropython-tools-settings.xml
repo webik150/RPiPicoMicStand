@@ -4,7 +4,7 @@
     <option name="activeStubsPackage" value="micropython-rp2-rpi_pico_w-stubs_1.24.1" />
     <option name="cachedFTPScriptPath" />
     <option name="pluginEnabled" value="true" />
-    <option name="portName" value="\\.\COM3" />
+    <option name="portName" value="COM4" />
     <option name="settingsVersion" value="2" />
   </component>
 </project>
