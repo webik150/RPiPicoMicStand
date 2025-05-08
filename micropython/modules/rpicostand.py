@@ -1,4 +1,5 @@
 import ujson, uasyncio
+import utime
 from machine import Pin
 
 from modules.displays import OLED_SSD1306
@@ -37,13 +38,13 @@ class Motor:
 
         if self.tmc.active:
             self.tmc.setMotorEnabled(False)
-            self.tmc.setDirection_reg(False)
+            self.tmc.setDirection_reg(True)
             self.tmc.setVSense(True)
             self.tmc.setCurrent(700)
             self.tmc.setIScaleAnalog(False)
             self.tmc.setInterpolation(True)
             self.tmc.setSpreadCycle(False)
-            self.tmc.setMicrosteppingResolution(64)
+            self.tmc.setMicrosteppingResolution(16)
             self.tmc.setInternalRSense(False)
 
             self.tmc.readIOIN()
@@ -92,9 +93,7 @@ class RPicoStand:
     def __init__(self):
         self.motors = {
             'x': Motor(dir_pin=5, step_pin=4, enable_pin=2, diag_pin=3, tx_pin=0, rx_pin=1, mtr_id=1),
-            #'y': Motor(dir_pin=Pin(6, Pin.OUT), step_pin=Pin(7, Pin.OUT), enable_pin=Pin(8, Pin.OUT, value=1), diag_pin=Pin(4, Pin.IN), tx_pin=Pin(1, Pin.OUT), rx_pin=Pin(2, Pin.IN)),
             'y': Motor(dir_pin=12, step_pin=11, enable_pin=10, diag_pin=7, tx_pin=0, rx_pin=1, mtr_id=0),
-            #'z': Motor(dir_pin=Pin(0, Pin.OUT), step_pin=Pin(1, Pin.OUT), enable_pin=Pin(2, Pin.OUT, value=1), diag_pin=Pin(4, Pin.IN), tx_pin=Pin(1, Pin.OUT), rx_pin=Pin(2, Pin.IN))
             'z': Motor(dir_pin=21, step_pin=20, enable_pin=19, diag_pin=18, tx_pin=0, rx_pin=1, mtr_id=2),
         }
         self.hostname = 'rpicostand'
@@ -108,6 +107,9 @@ class RPicoStand:
         self.networks = []
 
         self.display = OLED_SSD1306(enable_pin=13, sda_pin=14, scl_pin=15)
+        if not self.display.detected:
+            utime.sleep(1)
+            self.display = OLED_SSD1306(enable_pin=13, sda_pin=14, scl_pin=15)
         # self.display = LED_8SEG()
 
     def __del__(self):
@@ -188,16 +190,30 @@ class RPicoStand:
         self.display.fill(0)
         self.display.display_image("boot", 1)
         #self.display.test_brightness()
-        await uasyncio.sleep_ms(2000)
+        await uasyncio.sleep_ms(1500)
 
     async def initialize(self):
         # Initialize motors
         for key, motor in self.motors.items():
             Log.log_data(f"Initializing motor {key}")
+            self.display.display_centered_text(f"Init {key}", 16)
+            await uasyncio.sleep_ms(300)
             motor.initialize()
+            await uasyncio.sleep_ms(300)
             if motor.tmc.active:
+                Pin(21, Pin.OUT)(1)
                 motor.tmc.testDirStepEn()
+                motor.tmc.setMotorEnabled(True)
                 motor.tmc.setLoglevel(Loglevel.debug)
-                motor.tmc.doHoming(0)
+                motor.tmc.doHoming(1, 256)
+                motor.tmc.setAcceleration(10000)
+                motor.tmc.setMaxSpeed(10000)
+                motor.tmc.setDirection_reg(0)
+                motor.tmc.test_stallguard_threshold(800)
+                motor.tmc.setDirection_reg(1)
+                motor.tmc.test_stallguard_threshold(800)
+                self.display.display_centered_text(f"{key} works", 16)
+            else:
+                self.display.display_centered_text(f"{key} broke", 16)
             await uasyncio.sleep_ms(1000)
         Log.log_data(f"Motors initialized. Found motors {[key for key,motor in self.motors.items() if motor.tmc.active]}")

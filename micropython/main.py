@@ -25,8 +25,10 @@ from modules.displays import OLED_SSD1306
 print("Starting up")
 led = Pin("LED", Pin.OUT)
 led(1)
-utime.sleep_ms(3000)
+Pin(21, Pin.OUT)(1)
+utime.sleep_ms(500)
 led(0)
+
 
 @server.route("/", methods=['GET', 'POST'])
 def index(request):
@@ -207,6 +209,7 @@ async def start_work_mode():
     Log.log_data("Starting work mode...")
     # should already be connected to wifi, so just start the server
     await rpicostand.initialize()
+    #await rpicostand.initialize()
     server.run(host="0.0.0.0", port=80)  # Run the server
     Log.log_data("Work mode started.")
 

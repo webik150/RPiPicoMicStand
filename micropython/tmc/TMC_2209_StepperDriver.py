@@ -816,12 +816,12 @@ class TMC_2209:
     # when the movement was stopped
     # -----------------------------------------------------------------------
     def runToPositionSteps(self, steps, movement_abs_rel=None):
-        if (movement_abs_rel is not None):
+        if movement_abs_rel is not None:
             this_movement_abs_rel = movement_abs_rel
         else:
             this_movement_abs_rel = self._movement_abs_rel
 
-        if (this_movement_abs_rel == MovementAbsRel.relative):
+        if this_movement_abs_rel == MovementAbsRel.relative:
             self._targetPos = self._currentPos + steps
         else:
             self._targetPos = steps
@@ -832,7 +832,7 @@ class TMC_2209:
         self._n = 0
         self.computeNewSpeed()
         # print("speed:", self.computeNewSpeed())
-        while (self.run() and not self._stop):  # returns false, when target position is reached
+        while self.run() and not self._stop:  # returns false, when target position is reached
             pass
         return not self._stop
 
@@ -992,6 +992,11 @@ class TMC_2209:
         if (not (ioin & reg.io_enn)):
             pin_en_ok = False
 
+        if (pin_dir_ok):
+            print("Pin DIR: \tOK")
+        else:
+            print("Pin DIR: \tnot OK")
+
         self.p_pin_step.off()
         self.p_pin_dir.off()
         self.p_pin_en.off()
@@ -1003,6 +1008,11 @@ class TMC_2209:
             pin_step_ok = False
         if (ioin & reg.io_enn):
             pin_en_ok = False
+
+        if (pin_dir_ok):
+            print("Pin DIR: \tOK")
+        else:
+            print("Pin DIR: \tnot OK")
 
         self.p_pin_step.on()
         self.p_pin_dir.on()
@@ -1046,3 +1056,51 @@ class TMC_2209:
             self.p_pin_step.off()
             time.sleep(0.01)
 
+# Test methods
+# ----------------------------
+    def test_stallguard_threshold(self, steps):
+        """test method for tuning stallguard threshold
+
+        run this function with your motor settings and your motor load
+        the function will determine the minimum stallguard results for each movement phase
+
+        Args:
+            steps (int):
+        """
+        print("---")
+        print("test_stallguard_threshold")
+
+        self.setSpreadCycle(0)
+
+        min_stallguard_result_accel = 512
+        min_stallguard_result_maxspeed = 512
+        min_stallguard_result_decel = 512
+
+        self.runToPositionSteps(steps, MovementAbsRel.relative)
+
+
+        # while self.tmc_mc.movement_phase != MovementPhase.STANDSTILL:
+        #     stallguard_result = self.get_stallguard_result()
+        #     self.drvstatus.read()
+        #     cs_actual = self.drvstatus.cs_actual
+        #
+        #     print(f"{self.tmc_mc.movement_phase} | {stallguard_result} | {cs_actual}",
+        #                 Loglevel.INFO)
+        #
+        #     if (self.tmc_mc.movement_phase == MovementPhase.ACCELERATING and
+        #         stallguard_result < min_stallguard_result_accel):
+        #         min_stallguard_result_accel = stallguard_result
+        #     if (self.tmc_mc.movement_phase == MovementPhase.MAXSPEED and
+        #         stallguard_result < min_stallguard_result_maxspeed):
+        #         min_stallguard_result_maxspeed = stallguard_result
+        #     if (self.tmc_mc.movement_phase == MovementPhase.DECELERATING and
+        #         stallguard_result < min_stallguard_result_decel):
+        #         min_stallguard_result_decel = stallguard_result
+
+        # self.tmc_mc.wait_for_movement_finished_threaded()
+
+        print("---")
+        print(f"min StallGuard result during accel: {min_stallguard_result_accel}")
+        print(f"min StallGuard result during maxspeed: {min_stallguard_result_maxspeed}")
+        print(f"min StallGuard result during decel: {min_stallguard_result_decel}")
+        print("---")

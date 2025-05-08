@@ -303,6 +303,7 @@ class Icon:
 class OLED_SSD1306:
     def __init__(self, enable_pin, sda_pin, scl_pin):
         self.displaying = False
+        self.detected = False
         self.queue = deque((), 10)  # Queue with a maximum size of 10
         self.display_pwr = Pin(enable_pin, Pin.OUT)
         self.display_pwr(1)
@@ -312,6 +313,7 @@ class OLED_SSD1306:
             self.oled = SSD1306_I2C(128, 64, self.i2c)
             self.oled.poweron()  # power on the display, pixels redrawn
             self.oled.contrast(10)
+            self.detected = True
             Log.log_data("OLED detected")
         except OSError:
             Log.log_data("OLED not detected")
