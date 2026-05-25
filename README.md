@@ -1,44 +1,41 @@
-# RPiPicoMicStand
+# Rapic Micsta
+-# Raspberry Pi Pico Microphone Stand
 
-NOTE: This is VERY WIP, mostly in idea phase.
+This project aims to create a motorized microphone stand using old NEMA-17 stepper motors from Prusa MK3, controllable through a LAN web server hosted on a RPi Pico W using MicroPython.
 
-I don't have a better name rn, subject to change (suggestions welcome).
+The software part operates in two modes:
 
-This project aims to create a motorized microphone stand using old NEMA-17 stepper motors from Prusa MK3, controllable through a LAN web server hosted on a RPi Pico W using MicroPython. The hardware part rn works on a breadboard, once I design some PCB it'll also be stored here. 
-
-The software part (not implemented yet) operates in two modes:
-
-- **Pairing Mode**: When no Wi-Fi credentials are available at startup, the device creates a Wi-Fi Access Point (AP) and serves as a captive portal to allow users to configure the Wi-Fi settings.
+- **Pairing Mode**: When no Wi-Fi credentials are available at startup, or wi-fi connection is unsuccessful, the device creates a Wi-Fi Access Point (AP) and serves as a captive portal to allow users to configure the Wi-Fi settings. It is also possible to control the stand in this way in case you need to record in the field without any wifi for whatever reason.
 - **Work Mode**: Once Wi-Fi credentials are saved, the device connects to the saved network and serves a control website on the local network.
 
-## HW Features
+
+### Updates
+- **2025-04-21**: Update PCB to V2.1. It uses a much simpler and cheaper design. It's now just 2 layers instead of 4 and should be compatible with more types of TMC2209.
+- **2024-12-15**: Made a V2 of the PCB, it's much smaller, uses SMD components and TMC2209 instead of A4988. I also added a connector for an OLED display.
+- **2024-11-02**: PCB was tested out to be working so I added files for it along with pics. Feel free to have it made, I usually use JLCPCB for that. I also added an 8SEG display to the thing last minute, which means there's no connector for it on the PCB, however you can just solder 4 pins to the top of the Pico like in the pic below.
+
+## Features
 - Movement on X and Y axes (Forward/Back and Left/Right)
 - Mic rotation on one axis
+- Optional 8SEG display for debugging, info, stuff.
 - Powered by 12V, idk how many A will be needed yet.
 - I'll try to make as much of the actual structure 3D printable
-
-## SW Features
-1. **Pairing Mode**:
-   - Automatically activates if no Wi-Fi credentials are saved or (hopefully) by holding the BOOTSEL button for 10s after bootup.
-   - Creates an AP with a preset SSID and password.
-   - Acts as a captive portal for users to select which Wi-Fi network to join.
-   - Scans for available networks and allows the user to select one and input the password.
-
-2. **Work Mode**:
-   - After successful Wi-Fi configuration, the device connects to the network.
-   - Serves a local web page with controls to interact with the microphone stand.
-   - Technically this should also allow you to calibrate the stand and such (or maybe it should autocalibrate at start, but I feel like that might be dangerous if you just plug it in randomly by a mistake or whatever), but I'll see if I manage to figure out how Prusa auto-home works for XY axes.
-
-Alternativelly, the pairing mode could also have the controls directly, which would allow you to use the stand even without functional wifi (ig somewhere outside or at a venue).
+- The software side is just a HTML page that sends commands through AJAX rn.
 
 ## Requirements
 
 - **Hardware**:
-  - TODO
+  - PCB V2
+    - 1x Raspberry Pi Pico W (Pico W 1 is recommended for now as Pico W 2 micropython is in pre-release)
+    - 3x TMC2209. I'm using black+green V2, others *should* work, but sometimes the pin layout differs.
+    - 1x 12V 3A power supply
+    - 5V Buck converter (most I've seen support different input voltages 5-30V). Should support 3A.
+    - (optionally) SSD1306 OLED display. 128x64 works out of the box, 128x32 needs additional tweaks.
+  - Stand itself
+    - No idea yet.
 
 - **Software**:
   - MicroPython installed on the Pico W
-  - Thonny IDE (or any other Python IDE capable of uploading MicroPython scripts to the Pico W)
   - MicroPython modules:
     - `network` for Wi-Fi functionality
     - `socket` for HTTP server implementation
@@ -51,22 +48,17 @@ idk if this is correct, ChatGPT came up with these instructions and I haven't ha
     - Download the MicroPython firmware for Pico W from [here](https://micropython.org/download/rp2-pico-w/).
     - Flash the firmware to your Pico W using the Thonny IDE or another method.
 
-2. **Clone the Repository**:
-    ```bash
-    git clone https://github.com/yourusername/rpi-pico-w-lan-server.git
-    cd rpi-pico-w-lan-server
-    ```
+2. **Clone the Repository**
 
 3. **Upload Files to Pico W**:
     - Use Thonny or another IDE to upload the required Python files to your Pico W. The key files include:
         - `main.py`: The main logic for the pairing mode, Wi-Fi connection, and work mode.
-        - `wifi_config.json`: (Optional) Pre-existing Wi-Fi credentials file. This will be automatically generated by the device when the user sets up Wi-Fi through the captive portal.
+        - `img/`: Folder containing images for the UI.
+        - `index.html`: The control webpage.
+        - `modules/`: Folder containing Python modules for the HTTP server and Wi-Fi configuration.
 
 4. **Modify the Configuration**:
     - If you want to set a custom SSID and password for the access point, edit the following lines in `main.py`:
-      ```python
-      ap.config(essid='RPi_Pico_Setup', password='12345678')
-      ```
 
 5. **Running the Project**:
     - Plug in the Raspberry Pi Pico W, and the script will automatically run.
@@ -75,9 +67,9 @@ idk if this is correct, ChatGPT came up with these instructions and I haven't ha
 
 ## Usage
 
-### Pairing Mode
+### Pairing
 
-1. Connect to the Wi-Fi access point `RPi_Pico_Setup` with the password `12345678`.
+1. Connect to the Wi-Fi access point `RPiMicStand` with the password `12345678`.
 2. Your device (phone or computer) should automatically open a captive portal page.
 3. Select a network from the dropdown and enter the Wi-Fi password.
 4. Press "Apply" to save the credentials and switch to work mode.
@@ -88,15 +80,42 @@ idk if this is correct, ChatGPT came up with these instructions and I haven't ha
 2. Access the control page by navigating to the Pico's IP address in a web browser (use `wlan.ifconfig()` to find the IP).
 3. Use the sliders, buttons, and other controls on the page to interact with the Pico's GPIO pins or perform other tasks.
 
-## Example Screenshots
+## PCB
+KiCAD files are in the `PCB` folder. It could definitely be made much smaller, I might make a v2 sometime just for the fuck of it, or if necessary. 
 
-**Pairing Mode Captive Portal**:
+Right now RaPiPiMiSt uses 14 GPIO pins (3 for each motor, 5 for the display).
 
-![Captive Portal](./images/captive_portal_example.png)
+### Possible improvements (V2 Wishlist):
+  * Use SMD components instead of THT. It's just resistors and capacitors so nothing fancy.
+  * Get rid of the DIP switches and control the pins through Pico, there's enough PINS still.
+    * Should this even be configurable? I could theoretically hardwire it so that X/Y motors use 1/2 step and Z motor uses 1/16 step.
+    * If configurable, each motor would use 6 pins (23 total, which still fits). Alternatively only Z axis could be configurable.
+  * Add a connector for the display directly on the board
+  * Maybe switch over to an OLED display, which is cheaper, much more versatile and uses one less pin.
+    * Downside is I have to learn to make an UI for that, but it sounds fun.
+  * The power pin is made for a classic dupont pin rn, might be better to put it on the edge somewhere and make it use an actual on-board connector. Less wires.
+  * I limited myself to 2 layer PCB, but 4 layer one isn't actually that much more expensive and could make stuff much smaller.
+  * The A4988 is loud and has no stall detection. I could switch to a TMC2209 which is bit more expensive but would allow for automatic calibration and less pins used.
+  * Idk what the fail rate of these drivers is but they could be soldered to the board instead of using a socket.
+  * I could actually use vias instead of trying to go around everything lol.
+  * The pico could be soldered directly to the board without any headers
 
-**Work Mode Control Webpage**:
+RaPiPiMiSt PCB v01
+![Plain PCB](readme_images/pcb.jpg)
+Finished thing
+![Soldered PCB](readme_images/pcb2.jpg)
 
-![Work Mode Control Page](./images/work_mode_example.png)
+## Pics
+
+**Control website**:
+TODO
+![Captive Portal](readme_images/website.jpg)
+
+
+**Stand**:
+TODO
+![Captive Portal](readme_images/stand.jpg)
+
 
 ## License
 
